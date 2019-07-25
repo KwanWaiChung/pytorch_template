@@ -17,6 +17,8 @@ class Field:
         self.is_target = is_target
         self.lower = lower
         self.tokenize = tokenize
+        if not self.tokenize:
+            tokenize = lambda s: s.split()
         self.sequential = sequential
         self.numericalize = numericalize
 

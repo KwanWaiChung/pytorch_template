@@ -1,30 +1,31 @@
-from typing import Callable, List, Union
+from typing import Callable, List, Union, Tuple
+from collections import namedtuple
 
 
 class Pipeline:
-    def __init__(self, name: str, func: Callable[[str], str]):
-        if func:
-            self.func = func
-        else:
-            self.func = Pipeline.identity
-        self.next = None
-        self.name = name
+    Transform = namedtuple("Transform", ["name", "transform"])
 
-    def __call__(self, sentence: List[str]):
-        x = self.func(sentence)
-        if self.next:
-            return self.next(x)
-        return x
+    def __init__(self, steps: List[Tuple[str, Callable[[str], str]]]):
+        """
+        Args:
+            steps (List): List of (name, transform) tuples where `transform`
+                is a callable that receives a str and return a str
+        """
+        self.steps = [Pipeline.Transform(*step) for step in steps]
+
+    def __call__(self, sentence: Union[str, List[str]]):
+        for step in self.steps:
+            if isinstance(sentence, list):
+                sentence = [step.transform(tok) for tok in sentence]
+            else:
+                sentence = step.transform(sentence)
+        return sentence
 
     def add(
-        self, pipeline: Union["Pipeline", Callable[[str], str]]
+        self, steps: Union["Pipeline", List[Tuple[str, Callable[[str], str]]]]
     ) -> "Pipeline":
-        if not isinstance(pipeline, Pipeline):
-            pipeline = Pipeline(pipeline)
-        pipeline.next = self.next
-        self.next = pipeline
+        if isinstance(steps, List):
+            self.steps += [Pipeline.Transform(*step) for step in steps]
+        else:
+            self.steps += steps.steps
         return self
-
-    @staticmethod
-    def identity(s: str) -> str:
-        return s

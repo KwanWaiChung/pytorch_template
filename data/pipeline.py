@@ -22,10 +22,10 @@ class Pipeline:
         return sentence
 
     def add(
-        self, steps: Union["Pipeline", List[Tuple[str, Callable[[str], str]]]]
+        self, steps: Union["Pipeline", Tuple[str, Callable[[str], str]]]
     ) -> "Pipeline":
-        if isinstance(steps, List):
-            self.steps += [Pipeline.Transform(*step) for step in steps]
+        if isinstance(steps, tuple):
+            self.steps.append(Pipeline.Transform(*steps))
         else:
             self.steps += steps.steps
         return self

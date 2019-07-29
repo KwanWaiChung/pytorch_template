@@ -1,4 +1,5 @@
 import os
+import shutil
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -39,6 +40,7 @@ class TestLRFinder:
 
         self.model = Net()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.datapath = f"{os.path.dirname(os.path.realpath(__file__))}/data"
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -47,10 +49,7 @@ class TestLRFinder:
         )
 
         trainset = torchvision.datasets.CIFAR10(
-            root=f"{os.path.dirname(os.path.realpath(__file__))}/data",
-            train=True,
-            download=True,
-            transform=transform,
+            root=self.datapath, train=True, download=True, transform=transform
         )
         self.trainloader = torch.utils.data.DataLoader(
             trainset, batch_size=4, shuffle=True, num_workers=2
@@ -59,9 +58,15 @@ class TestLRFinder:
         testset = torchvision.datasets.CIFAR10(
             root="./data", train=False, download=True, transform=transform
         )
+        testset.data = testset.data[:100]
+        testset.targets = testset.targets[:100]
+
         self.testloader = torch.utils.data.DataLoader(
             testset, batch_size=4, shuffle=False, num_workers=2
         )
+
+    def teardown_method(self, method):
+        shutil.rmtree(self.datapath)
 
     def test_exponential_scheduling(self):
         criterion = nn.CrossEntropyLoss()
@@ -71,7 +76,7 @@ class TestLRFinder:
             self.model, optimizer, criterion, device=self.device
         )
         #  lr_finder(self.trainloader, self.testloader, 1, 100)
-        lr_finder(self.trainloader, None, 1, 10)
+        lr_finder(self.trainloader, self.testloader, 1, 10)
         lr_finder.plot()
         assert (
             self.handler.messages["info"][-1]

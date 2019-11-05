@@ -1,61 +1,75 @@
 import torch.utils.data
 from multiprocessing.pool import Pool
-from typing import Union, List, Callable
+from time import time
+from typing import Union, List, Callable, Dict
 from ..utils.misc import get_split_ratio
-from .field import Field
+from .example import Example
+from ..utils.logger import getlogger
+from functools import partial
+
+
+def _preprocess(example, fields):
+    return example.preprocess(fields)
 
 
 class Dataset(torch.utils.data.Dataset):
-    """Defines a dataset which contains `X` and `y`
-        after preprocessed and tokenized (if required)
+    """Defines a dataset composed of Examples along with its Fields
+
+    Attributes:
+        examples (List[Example]): A list holding all the unprocessed
+            examples. Each example will have attributes as indicated
+            in the keys of `fields`.
+        fields (Dict[str, Feild]): A dict that maps the name of
+            each attribute/columns of the examples to a Field, which
+            specified how to process them afterwards.
     """
 
     def __init__(
         self,
-        examples: List[List[str, Union[str, int]]],
-        fields: List[Field],
-        filter_pred: Callable[List[str, Union[str, int]], bool] = None,
+        examples: List[Example],
+        fields: Dict[str, "Field"],
+        filter_pred: Callable[[Example], bool] = None,
+        sort_key: Callable[["Example"], int] = None,
         n_jobs: int = -1,
     ):
         """
         Args:
-            examples (List[List[str, Union[str, int]]]): A list holding
-                all the raw examples each example would be a list containing
-                the `x` (str) and the `y` (str/int). Both x and y are just
-                raw strings without preprocessing
-            fields (List[field]): A list holding the corresponding `Field`
-                object for `X` and `y` respectively. The `Field` object
-                specifies how to process with them.
-            filter_pred (Callable[Tuple[str, Union[str, int]], bool]): A
-                predicate function that filters out the examples. Only
-                the examples of which the predicate evalutes to `True`
-                will be used. Default is None.
+            examples (List[Example]): A list holding all the unprocessed
+                examples. Each example will have attributes as indicated
+                in the keys of `fields`.
+            fields (Dict[str, Feild]): A dict that maps the name of
+                each attribute/columns of the examples to a Field, which
+                specified how to process them afterwards.
+            filter_pred (Callable[[Example], bool]): A predicate function
+                that filters out the examples. Only the examples of which
+                the predicate evalutes to `True`will be used. Default is None.
             n_jobs (int): The number of jobs to use for the computation.
                 -1 means using all processors. Default: -1.
         """
-        # TODO: Add test case (preprocessing)
         if n_jobs == -1:
-            p_X = Pool()
-            p_y = Pool()
+            p = Pool()
         else:
-            p_X = Pool(n_jobs)
-            p_y = Pool(n_jobs)
+            p = Pool(n_jobs)
 
-        self.X = p_X.map_async(
-            fields[0].preprocess, (example[0] for example in examples)
-        )
-        self.y = p_y.map_async(
-            fields[1].preprocess, (example[1] for example in examples)
+        self.logger = getlogger(__name__)
+
+        self.logger.info(
+            "Starting to preprocess the %d examples", len(examples)
         )
 
-        # TODO: Add test case (filtering examples)
+        current_time = time()
+        self.examples = p.map(partial(_preprocess, fields=fields), examples)
+        self.fields = fields
+        self.sort_key = sort_key
+        self.logger.info(
+            "Finished preprocessing the examples. Total time: %f",
+            time() - current_time,
+        )
+
         if filter_pred:
-            examples = [
-                example
-                for example in zip(self.X, self.y)
-                if filter_pred(example)
+            self.examples = [
+                example for example in self.examples if filter_pred(example)
             ]
-            self.X, self.y = [list(dummy) for dummy in zip(*examples)]
 
     def split(
         self,
@@ -66,3 +80,18 @@ class Dataset(torch.utils.data.Dataset):
     ):
         """Create train-test(-valid) splits from the examples"""
         train_ratio, test_ratio, val_ratio = get_split_ratio(split_ratio)
+
+    def __getitem__(self, i):
+        return self.examples[i]
+
+    def __iter__(self):
+        for x in self.examples:
+            yield x
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getattr__(self, attr):
+        if attr in self.fields:
+            for x in self.examples:
+                yield getattr(x, attr)

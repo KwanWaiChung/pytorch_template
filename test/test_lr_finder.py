@@ -77,7 +77,7 @@ class TestLRFinder:
         )
         #  lr_finder(self.trainloader, self.testloader, 1, 100)
         lr_finder(self.trainloader, self.testloader, 1, 10)
-        lr_finder.plot()
+        #  lr_finder.plot()
         assert (
             self.handler.messages["info"][-1]
             == "Learning rate search finished. "

@@ -3,9 +3,10 @@ from tqdm import tqdm
 import zipfile
 import requests
 import os
+import math
 
 CHUNK_SIZE = 32768
-DOWNLOAD_URL = "https://docs.google.com/uc?export=download"
+DOWNLOAD_URL = "https://drive.google.com/uc?export=download"
 
 
 def download_from_googledrive(file_id: str, dst_path: str, unzip: bool = True):

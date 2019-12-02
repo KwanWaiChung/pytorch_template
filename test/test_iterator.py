@@ -80,9 +80,6 @@ def test_iteration():
         to_shuffle=False,
     )
 
-    import pdb
-
     for (f, e) in iterator:
         assert type(f) == torch.Tensor
         assert type(e) == torch.Tensor
-        pdb.set_trace()

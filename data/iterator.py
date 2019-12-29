@@ -3,39 +3,54 @@ from multiprocessing.pool import Pool
 
 
 class Iterator:
+    """Defines an iterator that loads batches of data from a Dataset
+
+    It is iterable. We can loop over the batches. Each batch returns
+    few `torch.Tensor` which corresponds to `self.dataset.fields`.
+    If `include_lengths` is True, the `length` Tensor will be given
+    after that field (X, len_X, y, len_y).
+        >>> ds = Dataset(examples=examples, fields=dict(fields))
+        >>> it = Iterator(dataset=ds, batch_size=4)
+        >>> for train_X, train_y in it:
+        ...     print(train_X.shape)
+        (batch_size, seq_len, feature_dim)
+
+    Attributes:
+        dataset (Dataset): The Dataset object to load Examples from.
+        batch_size (int): Batch size.
+        seed (int): The random seed used for shuffling.
+        batcher (Batcher): An util object that helps to batch the examples.
+            It shuffles and sorts the batches if necessary.
+    """
+
     def __init__(
         self,
-        field_names,
         dataset,
         batch_size,
-        seed,
-        sort_within_batch,
-        to_shuffle,
+        seed=0,
+        sort_within_batch=False,
+        to_shuffle=False,
     ):
-        self.field_names = field_names
+        """Defines an iterator that loads batches of data from a Dataset
+
+        Attributes:
+            dataset (Dataset): The Dataset object to load Examples from.
+            batch_size (int): Batch size.
+            seed (int): The random seed used for shuffling.
+            batch(Batcher): An util object that helps to shuffle and
+                sort if necessary.
+        """
         self.dataset = dataset
         self.batch_size = batch_size
-        self.batcher = Batcher(
-            dataset.examples,
-            batch_size,
-            seed,
-            dataset.sort_key,
-            sort_within_batch,
-            to_shuffle,
-        )
-        self.batch_size = batch_size
         self.seed = seed
-        for field_name in field_names:
-            if field_name not in dataset.fields:
-                raise ValueError(
-                    f"The dataset has no field named `{field_name}`"
-                )
+        self.batcher = Batcher(
+            dataset, batch_size, seed, sort_within_batch, to_shuffle
+        )
 
     def __iter__(self):
         for minibatch in self.batcher:
             result = []
-            for field_name in self.field_names:
-                field = self.dataset.fields[field_name]
+            for field_name, field in self.dataset.fields.items():
                 batch = [getattr(example, field_name) for example in minibatch]
                 batch = field.process(batch)
                 if field.include_lengths:

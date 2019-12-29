@@ -1,96 +1,55 @@
 from ..data.example import Example
 from ..data.field import Field
+from ..data.dataset import Dataset
 from ..data.batcher import Batcher, BucketBatcher
 import numpy as np
 import os
 import random
 
+random.seed(0)
+
+FIELD = Field(
+    is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
+)
+FIELDS = [("text", FIELD)]
+with open(
+    f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
+    "r",
+    encoding="utf-8",
+) as f:
+    DATA = [l.strip() for l in f][:50]
+EXAMPLES = [Example.fromlist([example], FIELDS) for example in DATA]
+DS = Dataset(EXAMPLES, dict(FIELDS), sort_key=lambda x: len(x.text))
+
 
 def test_shuffle_examples():
-    field = Field(
-        is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
+    batcher = Batcher(
+        DS, batch_size=4, seed=0, sort_within_batch=False, to_shuffle=True
     )
-    fields = [("text", field)]
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        data = [l.strip() for l in f][:50]
-    examples = [Example.fromlist([example], fields) for example in data]
+    shuffled_examples = batcher._shuffle_examples()
+    assert shuffled_examples != DS.examples
 
     batcher = Batcher(
-        examples,
-        batch_size=4,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        DS, batch_size=4, seed=0, sort_within_batch=False, to_shuffle=False
     )
-    new_examples = batcher._shuffle_examples()
-    assert new_examples != examples
-
-    batcher = Batcher(
-        examples,
-        batch_size=4,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=False,
-    )
-    new_examples = batcher._shuffle_examples()
-    assert new_examples == examples
+    shuffled_examples = batcher._shuffle_examples()
+    assert shuffled_examples == DS.examples
 
 
 def test_iteration_with_no_shuffle_and_no_sort():
-    field = Field(
-        is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
-    )
-    fields = [("text", field)]
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        data = [l.strip() for l in f][:50]
-    examples = [Example.fromlist([example], fields) for example in data]
-
     batcher = Batcher(
-        examples,
-        batch_size=4,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=False,
-        to_shuffle=False,
+        DS, batch_size=4, seed=0, sort_within_batch=False, to_shuffle=False
     )
     for i, batch in enumerate(batcher):
-        assert batch == examples[i * 4 : i * 4 + 4]
+        assert batch == DS.examples[i * 4 : i * 4 + 4]
 
 
 def test_iteration_with_shuffle_and_no_sort():
-    field = Field(
-        is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
-    )
-    fields = [("text", field)]
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        data = [l.strip() for l in f][:50]
-    examples = [Example.fromlist([example], fields) for example in data]
-
     batcher = Batcher(
-        examples,
-        batch_size=4,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=False,
-        to_shuffle=True,
+        DS, batch_size=4, seed=0, sort_within_batch=False, to_shuffle=True
     )
 
-    random.seed(0)
-    examples = random.sample(examples, len(examples))
+    examples = random.sample(DS.examples, len(DS.examples))
 
     is_sorted = True
     for i, minibatch in enumerate(batcher):
@@ -102,43 +61,19 @@ def test_iteration_with_shuffle_and_no_sort():
 
 
 def test_iteration_with_shuffle_and_sort():
-    field = Field(
-        is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
-    )
-    fields = [("text", field)]
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        data = [l.strip() for l in f][:50]
-    examples = [Example.fromlist([example], fields) for example in data]
-
     batcher = Batcher(
-        examples,
-        batch_size=4,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        DS, batch_size=4, seed=0, sort_within_batch=True, to_shuffle=True
     )
-    batcher2 = Batcher(
-        examples,
-        batch_size=4,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
-    )
-
-    import random
 
     random.seed(0)
-    examples = random.sample(examples, len(examples))
+    examples = random.sample(DS.examples, len(DS.examples))
     for i, minibatch in enumerate(batcher):
         length = len(minibatch[0].text)
         subexamples = examples[i * 4 : i * 4 + 4]
         # check length
+        assert minibatch == sorted(
+            subexamples, key=lambda x: len(x.text), reverse=True
+        )
         for example in minibatch:
             assert len(example.text) <= length
             assert example in subexamples
@@ -146,40 +81,14 @@ def test_iteration_with_shuffle_and_sort():
 
 
 def test_seed():
-    field = Field(
-        is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
-    )
-    fields = [("text", field)]
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        data = [l.strip() for l in f][:50]
-    examples = [Example.fromlist([example], fields) for example in data]
     batcher = Batcher(
-        examples,
-        batch_size=4,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        DS, batch_size=4, seed=0, sort_within_batch=True, to_shuffle=True
     )
     batcher2 = Batcher(
-        examples,
-        batch_size=4,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        DS, batch_size=4, seed=0, sort_within_batch=True, to_shuffle=True
     )
     batcher3 = Batcher(
-        examples,
-        batch_size=4,
-        seed=1,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        DS, batch_size=4, seed=1, sort_within_batch=True, to_shuffle=True
     )
     is_different1 = False
     is_different2 = False
@@ -206,23 +115,14 @@ def test_bucket_batcher():
     data = [["Hello", "world"]] * 50 + [["hi"]] * 50
     random.shuffle(data)
     examples = [Example.fromlist([example], fields) for example in data]
+    dataset = Dataset(examples, dict(fields), sort_key=lambda x: len(x.text))
 
     bbatcher = BucketBatcher(
-        examples,
-        batch_size=50,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        dataset, batch_size=50, seed=0, sort_within_batch=True, to_shuffle=True
     )
 
     batcher = Batcher(
-        examples,
-        batch_size=50,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        dataset, batch_size=50, seed=0, sort_within_batch=True, to_shuffle=True
     )
 
     # test the minimize padding logic
@@ -238,29 +138,15 @@ def test_bucket_batcher():
     # test the minibatch shuffling
     data = [["hi"] * i for i in range(100)]
     examples = [Example.fromlist([example], fields) for example in data]
+    ds = Dataset(examples, dict(fields), sort_key=lambda x: len(x.text))
     bbatcher1 = BucketBatcher(
-        examples,
-        batch_size=2,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        ds, batch_size=2, seed=0, sort_within_batch=True, to_shuffle=True
     )
     bbatcher2 = BucketBatcher(
-        examples,
-        batch_size=2,
-        seed=0,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        ds, batch_size=2, seed=0, sort_within_batch=True, to_shuffle=True
     )
     bbatcher3 = BucketBatcher(
-        examples,
-        batch_size=2,
-        seed=1024,
-        sort_key=lambda x: len(x.text),
-        sort_within_batch=True,
-        to_shuffle=True,
+        ds, batch_size=2, seed=1024, sort_within_batch=True, to_shuffle=True
     )
 
     is_different1 = False

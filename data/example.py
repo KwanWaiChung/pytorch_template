@@ -3,6 +3,12 @@ from ..data.field import Field
 
 
 class Example:
+    """Defines a single example or sample
+
+    Attributes:
+        Each column of the example is an attribute.
+    """
+
     @classmethod
     def fromlist(cls, data: List[str], fields: List[Tuple[str, Field]]):
         """Create an example from a list of attrbutes.

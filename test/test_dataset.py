@@ -72,12 +72,33 @@ def test_filter_pred():
         assert len(ex) < 100
 
 
-#  def test_speed():
-#  transform = [("wait", func)]
-#  field = Field(preprocessing=transform, is_sequential=True, tokenizer=None)
-#  fields = [("text", field)]
-#  examples = ["hello"] * 10
-#  examples = [Example.fromlist([example], fields) for example in examples]
-#  fields = dict(fields)
-#  ds = Dataset(examples, fields)
-#  return True
+def test_split():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=False,
+        eos_token="<eos>",
+        sos_token="<sos>",
+    )
+    label = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        is_target=True,
+        to_lower=False,
+    )
+    fields = [("text", text), ("label", label)]
+
+    data = [["a happy comment", "positive"]] * 100 + [
+        ["sad comment", "negative"]
+    ] * 10
+
+    examples = [Example.fromlist(example, fields) for example in data]
+    ds = Dataset(examples, dict(fields))
+    train_examples, test_examples, val_examples = ds.split(
+        [0.8, 0.1, 0.1], stratify_field="label"
+    )
+
+    # check portion
+    assert len(train_examples) == len(data) * 0.8
+    assert len(test_examples) == len(data) * 0.1
+    assert len(val_examples) == len(data) * 0.1

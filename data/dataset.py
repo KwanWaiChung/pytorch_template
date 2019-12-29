@@ -1,4 +1,5 @@
 import torch.utils.data
+import random
 from multiprocessing.pool import Pool
 from time import time
 from typing import Union, List, Callable, Dict
@@ -6,6 +7,7 @@ from ..utils.misc import get_split_ratio
 from .example import Example
 from ..utils.logger import getlogger
 from functools import partial
+from sklearn.model_selection import train_test_split
 
 
 def _preprocess(example, fields):
@@ -15,13 +17,29 @@ def _preprocess(example, fields):
 class Dataset(torch.utils.data.Dataset):
     """Defines a dataset composed of Examples along with its Fields
 
+    It is iterable. We will loop over the Examples.
+        >>> ds = Dataset(examples, dict(fields))
+        >>> for example in ds:
+                print(example.text)
+
+    It is indexable. We can access the ith Example object.
+        >>> ds = Dataset(examples, dict(fields))
+        >>> example = ds[4]
+
+    We can also loop over certain field of all Examples too.
+        >>> ds = Dataset(examples, dict(fields))
+        >>> for example in ds.text:
+                print(example)
+
     Attributes:
-        examples (List[Example]): A list holding all the unprocessed
+        examples (List[Example]): A list holding all the preprocessed
             examples. Each example will have attributes as indicated
-            in the keys of `fields`.
-        fields (Dict[str, Feild]): A dict that maps the name of
+            in the keys of the attribute `fields`.
+        fields (Dict[str, Field]): A dict that maps the name of
             each attribute/columns of the examples to a Field, which
             specified how to process them afterwards.
+        sort_key (Callable[[Example]]): A key to use for sorting examples.
+            Usually its the length of some attributes.
     """
 
     def __init__(
@@ -73,13 +91,51 @@ class Dataset(torch.utils.data.Dataset):
 
     def split(
         self,
-        split_ratio: Union[List[float], float],
-        stratified=False,
-        strat_field=None,
-        random_state=None,
+        split_ratio: Union[List[float], float, int],
+        stratify_field: str = None,
+        seed: int = 0,
     ):
-        """Create train-test(-valid) splits from the examples"""
+        """Create train-test(-valid) splits from the examples
+
+        Args:
+            split_ratio (Union[List[float], float, int]): if float, should be
+                between 0.0 and 1.0 and represent the proportion of the dataset
+                to include in the train split.
+                If List[float], should be of length of 2 or 3 indicating the
+                portion for train, test and (val).
+                If int, represents the absolute number of train samples.
+            stratify_field (bool): The name of the examples `Field` to
+                stratify.
+            seed: The seed for splitting.
+        """
+        if stratify_field and stratify_field not in self.fields:
+            raise ValueError(
+                f"Invalid field name for stratify_field: {stratify_field}"
+            )
+
         train_ratio, test_ratio, val_ratio = get_split_ratio(split_ratio)
+        n_test = int(test_ratio * len(self))
+        n_val = int(val_ratio * len(self))
+
+        train_examples, test_examples = train_test_split(
+            self.examples,
+            test_size=n_test,
+            stratify=list(getattr(self, stratify_field))
+            if stratify_field
+            else None,
+            random_state=seed,
+        )
+        train_examples, val_examples = train_test_split(
+            train_examples,
+            test_size=n_val,
+            stratify=[
+                getattr(example, stratify_field) for example in train_examples
+            ]
+            if stratify_field
+            else None,
+            random_state=seed,
+        )
+        return train_examples, test_examples, val_examples
 
     def __getitem__(self, i):
         return self.examples[i]

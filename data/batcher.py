@@ -12,15 +12,21 @@ class Batcher:
     Examples are not processed (pad and numericalize) yet.
 
     Attributes:
-
+        examples(List[Example]): The full List of examples.
+        batch_size: Batch size.
+        seed: The seed for random shuffling.
+        sort_key: A key to use for sorting examples. Usually
+            its the length of some attributes.
+        sort_within_batch: Whether to sort (in descending order)
+            within each batch.
+        to_shuffle: Whether to shuffle examples between epochs.
     """
 
     def __init__(
         self,
-        examples: List[Example],
+        dataset: "Dataset",
         batch_size: int,
         seed: int = 0,
-        sort_key: Callable[["Example"], int] = None,
         sort_within_batch: bool = None,
         to_shuffle: bool = None,
     ):
@@ -33,30 +39,32 @@ class Batcher:
                 its the length of some attributes.
             sort_within_batch: Whether to sort (in descending order)
                 within each batch.
-            to_shuffle: Whter to shuffle examples between epochs.
+            to_shuffle: Whether to shuffle examples between epochs.
         """
-        self.examples = examples
+        self.dataset = dataset
         self.batch_size = batch_size
         self._random = random.Random(seed)
-        self.sort_key = sort_key
         self.sort_within_batch = sort_within_batch
         self.to_shuffle = to_shuffle
 
     def _shuffle_examples(self):
+        examples = self.dataset.examples
         if self.to_shuffle:
-            return self._random.sample(self.examples, len(self.examples))
+            return self._random.sample(examples, len(examples))
         else:
-            return self.examples
+            return examples
 
     def __iter__(self):
         examples = self._shuffle_examples()
         for minibatch in batch(examples, self.batch_size):
             if self.sort_within_batch:
-                minibatch = sorted(minibatch, key=self.sort_key, reverse=True)
+                minibatch = sorted(
+                    minibatch, key=self.dataset.sort_key, reverse=True
+                )
             yield minibatch
 
     def __len__(self):
-        return math.ceil(len(self.examples) / self.batch_size)
+        return math.ceil(len(self.dataset.examples) / self.batch_size)
 
 
 class BucketBatcher(Batcher):
@@ -65,7 +73,7 @@ class BucketBatcher(Batcher):
             return super().__iter__()
         examples = self._shuffle_examples()
         for bucket in batch(examples, self.batch_size * 100):
-            bucket = sorted(bucket, key=self.sort_key, reverse=True)
+            bucket = sorted(bucket, key=self.dataset.sort_key, reverse=True)
             minibatches = list(batch(bucket, self.batch_size))
             if self.to_shuffle:
                 minibatches = self._random.sample(

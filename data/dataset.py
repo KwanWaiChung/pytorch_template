@@ -1,8 +1,10 @@
 import torch.utils.data
 import random
+import pandas as pd
+import os
 from multiprocessing.pool import Pool
 from time import time
-from typing import Union, List, Callable, Dict
+from typing import Union, List, Callable, Dict, Any
 from ..utils.misc import get_split_ratio
 from .example import Example
 from ..utils.logger import getlogger
@@ -151,3 +153,34 @@ class Dataset(torch.utils.data.Dataset):
         if attr in self.fields:
             for x in self.examples:
                 yield getattr(x, attr)
+
+
+class TabularDataset(Dataset):
+    """Defines a Dataset of columns stored in CSV or JSON format."""
+
+    def __init__(
+        self,
+        path: str,
+        format: str,
+        fields: Dict[str, "Field"],
+        csv_params: Dict[str, Any],
+    ):
+        """Create a Dataset given the path, file format, and fields.
+
+        Arguments:
+            path (str): Path to the data file.
+            format (str): The format of the data file. One of "csv"
+                or "json".
+            fields (Dict[str, Field]): A dict that maps the columns
+                of the data file to a Field. The keys must be a
+                subset of the json keys or csv columns.
+            csv_params (Dict[str, Any]): The extra parameters that got
+                passed to pandas.read_csv
+        """
+        if not os.path.isfile(path):
+            raise ValueError(f"The path '{path}' doesn't exist.")
+        format = format.lower()
+        if format not in ["csv", "json"]:
+            raise ValueError(
+                f"Format must be one of 'csv' or 'json', received '{format}'"
+            )

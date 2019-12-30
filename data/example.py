@@ -10,7 +10,9 @@ class Example:
     """
 
     @classmethod
-    def fromlist(cls, data: List[str], fields: List[Tuple[str, Field]]):
+    def fromlist(
+        cls, data: List[str], fields: List[Tuple[str, Field]]
+    ) -> "Example":
         """Create an example from a list of attrbutes.
 
         Args:

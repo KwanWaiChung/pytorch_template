@@ -1,6 +1,7 @@
 import torch.utils.data
 import random
 import pandas as pd
+import json
 import os
 from multiprocessing.pool import Pool
 from time import time
@@ -163,19 +164,23 @@ class TabularDataset(Dataset):
         path: str,
         format: str,
         fields: Dict[str, "Field"],
-        csv_params: Dict[str, Any],
+        reader_params: Dict[str, Any],
+        postprocessor: Callable[[Any], List[Dict]] = None,
     ):
         """Create a Dataset given the path, file format, and fields.
 
-        Arguments:
+        Args:
             path (str): Path to the data file.
             format (str): The format of the data file. One of "csv"
                 or "json".
             fields (Dict[str, Field]): A dict that maps the columns
                 of the data file to a Field. The keys must be a
                 subset of the json keys or csv columns.
-            csv_params (Dict[str, Any]): The extra parameters that got
-                passed to pandas.read_csv
+            reader_params (Dict[str, Any]): The extra parameters that got
+                passed to pandas.read_csv() if csv or open() if json
+            postprocessor (Callable): Apply to convert the format to List
+                of Dict after reading the file from pandas.read_csv() or
+                json.load().
         """
         if not os.path.isfile(path):
             raise ValueError(f"The path '{path}' doesn't exist.")
@@ -184,3 +189,30 @@ class TabularDataset(Dataset):
             raise ValueError(
                 f"Format must be one of 'csv' or 'json', received '{format}'"
             )
+        reader = {"csv": self.read_csv, "json": self.read_json}[format]
+        examples = reader(path, reader_params, postprocessor)
+
+        @classmethod
+        def read_csv(
+            path: str,
+            params: Dict[str, Any],
+            postprocessor: Callable[[Any], List[Dict]] = None,
+        ) -> List[Dict[str, Any]]:
+            """Read csv and return list of dict of columns"""
+            df = pd.read_csv(path, **params)
+            if postprocessor:
+                df = postprocessor(df)
+            return df.to_dict("records")
+
+        @classmethod
+        def read_json(
+            path: str,
+            params: Dict[str, Any],
+            postprocessor: Callable[[Any], List[Dict]] = None,
+        ) -> List[Dict[str, Any]]:
+            """Read json and return list of dict of columns"""
+            with open(path, **params) as f:
+                j = json.load(f)
+            if postprocessor:
+                j = postprocessor(j)
+            return j

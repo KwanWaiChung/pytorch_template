@@ -11,7 +11,7 @@ random.seed(0)
 FIELD = Field(
     is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
 )
-FIELDS = [("text", FIELD)]
+FIELDS = {"text": FIELD}
 with open(
     f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
     "r",
@@ -19,7 +19,7 @@ with open(
 ) as f:
     DATA = [l.strip() for l in f][:50]
 EXAMPLES = [Example.fromlist([example], FIELDS) for example in DATA]
-DS = Dataset(EXAMPLES, dict(FIELDS), sort_key=lambda x: len(x.text))
+DS = Dataset(EXAMPLES, FIELDS, sort_key=lambda x: len(x.text))
 
 
 def test_shuffle_examples():
@@ -111,11 +111,11 @@ def test_bucket_batcher():
         sos_token="<sos>",
         tokenizer=None,
     )
-    fields = [("text", field)]
+    fields = {"text": field}
     data = [["Hello", "world"]] * 50 + [["hi"]] * 50
     random.shuffle(data)
     examples = [Example.fromlist([example], fields) for example in data]
-    dataset = Dataset(examples, dict(fields), sort_key=lambda x: len(x.text))
+    dataset = Dataset(examples, fields, sort_key=lambda x: len(x.text))
 
     bbatcher = BucketBatcher(
         dataset, batch_size=50, seed=0, sort_within_batch=True, to_shuffle=True
@@ -138,7 +138,7 @@ def test_bucket_batcher():
     # test the minibatch shuffling
     data = [["hi"] * i for i in range(100)]
     examples = [Example.fromlist([example], fields) for example in data]
-    ds = Dataset(examples, dict(fields), sort_key=lambda x: len(x.text))
+    ds = Dataset(examples, fields, sort_key=lambda x: len(x.text))
     bbatcher1 = BucketBatcher(
         ds, batch_size=2, seed=0, sort_within_batch=True, to_shuffle=True
     )

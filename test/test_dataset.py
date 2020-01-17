@@ -29,7 +29,7 @@ def test_dataset_preprocess():
         eos_token="<eos>",
         sos_token="<sos>",
     )
-    fields = [("text", field)]
+    fields = {"text": field}
     with open(
         f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
         "r",
@@ -37,7 +37,7 @@ def test_dataset_preprocess():
     ) as f:
         data = [l.strip() for l in f][:50]
     examples = [Example.fromlist([example], fields) for example in data]
-    ds = Dataset(examples, dict(fields))
+    ds = Dataset(examples, fields)
     assert len(ds) == len(data)
     assert isinstance(ds[0], Example)
     assert isinstance(ds[0].text, list)
@@ -59,7 +59,7 @@ def test_filter_pred():
         eos_token="<eos>",
         sos_token="<sos>",
     )
-    fields = [("text", field)]
+    fields = {"text": field}
     with open(
         f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
         "r",
@@ -67,7 +67,7 @@ def test_filter_pred():
     ) as f:
         data = [l.strip() for l in f]
     examples = [Example.fromlist([example], fields) for example in data]
-    ds = Dataset(examples, dict(fields), filter_pred=filter_long)
+    ds = Dataset(examples, fields, filter_pred=filter_long)
     for ex in ds.text:
         assert len(ex) < 100
 
@@ -86,14 +86,14 @@ def test_split():
         is_target=True,
         to_lower=False,
     )
-    fields = [("text", text), ("label", label)]
+    fields = {"text": text, "label": label}
 
     data = [["a happy comment", "positive"]] * 100 + [
         ["sad comment", "negative"]
     ] * 10
 
     examples = [Example.fromlist(example, fields) for example in data]
-    ds = Dataset(examples, dict(fields))
+    ds = Dataset(examples, fields)
     train_examples, test_examples, val_examples = ds.split(
         [0.8, 0.1, 0.1], stratify_field="label"
     )

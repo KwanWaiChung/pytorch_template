@@ -126,9 +126,9 @@ def test_build_vocab_with_one_dataset():
     )
 
     encoder = TextEncoder()
-    fields = [("text", field)]
+    fields = {"text": field}
     examples = [Example.fromlist([example], fields) for example in data]
-    ds = Dataset(examples, dict(fields))
+    ds = Dataset(examples, fields)
     field.build_vocab(encoder, ds)
 
     from collections import Counter
@@ -154,12 +154,12 @@ def test_build_vocab_with_two_dataset():
     )
 
     encoder = TextEncoder()
-    fields = [("text", field)]
+    fields = {"text": field}
 
     examples1 = [Example.fromlist([example], fields) for example in data1]
     examples2 = [Example.fromlist([example], fields) for example in data2]
-    ds1 = Dataset(examples1, dict(fields))
-    ds2 = Dataset(examples2, dict(fields))
+    ds1 = Dataset(examples1, fields)
+    ds2 = Dataset(examples2, fields)
     field.build_vocab(encoder, ds1, ds2)
 
     assert encoder.stof == {
@@ -197,9 +197,9 @@ def test_process():
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    fields = [("text", field)]
+    fields = {"text": field}
     examples = [Example.fromlist([example], fields) for example in data]
-    ds = Dataset(examples, dict(fields))
+    ds = Dataset(examples, fields)
     field.build_vocab(encoder, ds)
 
     batch = field.process(list(ds.text)[:4])
@@ -234,8 +234,9 @@ def test_process_with_length():
         unk_token="<unk>",
     )
     fields = [("text", field)]
+    fields = {"text": field}
     examples = [Example.fromlist([example], fields) for example in data]
-    ds = Dataset(examples, dict(fields))
+    ds = Dataset(examples, fields)
     field.build_vocab(encoder, ds)
 
     batch = field.process(list(ds.text)[:4])

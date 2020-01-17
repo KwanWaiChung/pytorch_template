@@ -53,9 +53,9 @@ def test_basic_iteration():
     fre_field = Field(
         is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
     )
-    fields = [("eng", eng_field), ["fre", fre_field]]
+    fields = {"eng": eng_field, "fre": fre_field}
     examples = [Example.fromlist(example, fields) for example in data]
-    ds = Dataset(examples, dict(fields), sort_key=lambda x: len(x.eng))
+    ds = Dataset(examples, fields, sort_key=lambda x: len(x.eng))
     eng_encoder = TextEncoder(
         sos_token="<sos>",
         eos_token="<eos>",
@@ -132,9 +132,9 @@ def test_sort_within_batch():
         sos_token="<sos>",
         include_lengths=True,
     )
-    fields = [("eng", eng_field), ["fre", fre_field]]
+    fields = {"eng": eng_field, "fre": fre_field}
     examples = [Example.fromlist(example, fields) for example in data]
-    ds = Dataset(examples, dict(fields), sort_key=lambda x: len(x.eng))
+    ds = Dataset(examples, fields, sort_key=lambda x: len(x.eng))
     eng_encoder = TextEncoder(
         sos_token="<sos>",
         eos_token="<eos>",

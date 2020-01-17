@@ -1,4 +1,4 @@
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 from ..data.field import Field
 
 
@@ -10,9 +10,7 @@ class Example:
     """
 
     @classmethod
-    def fromlist(
-        cls, data: List[str], fields: List[Tuple[str, Field]]
-    ) -> "Example":
+    def fromlist(cls, data: List[str], fields: Dict[str, Field]) -> "Example":
         """Create an example from a list of attrbutes.
 
         Args:
@@ -28,9 +26,29 @@ class Example:
                 "The number of attributes doesn't match the number of fields. "
                 f"{len(fields)} fields but the data has {len(data)} columns"
             )
-        for (name, field), val in zip(fields, data):
+        for (name, field), val in zip(fields.items(), data):
             setattr(ex, name, val)
         return ex
+
+    @classmethod
+    def fromdict(
+        cls, data: Dict[str, Any], fields: Dict[str, Field]
+    ) -> "Example":
+        """Create an example from a dict of attributes.
+
+        Args:
+            data: Dict of attribute name to values of that example.
+            fields: Dict of attirbute name to Field object.
+        Returns:
+            The Example object
+        """
+        ex = cls()
+        for name, field in fields.items():
+            if name not in data:
+                raise ValueError(
+                    f"Specified key {name} was not found in the input data."
+                )
+            setattr(ex, name, data[name])
 
     def preprocess(self, fields: Dict[str, Field]):
         """Preprocess the fields of this example.

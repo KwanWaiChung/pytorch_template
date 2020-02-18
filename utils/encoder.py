@@ -1,12 +1,27 @@
 from collections import Counter
-from typing import List
+from typing import List, Dict
 from .misc import flatten_2d
-import numpy as np
 from .logger import getlogger
+from ..exceptions.NotFittedError import NotFittedError
+import numpy as np
+import pickle
 
 
 class LabelEncoder:
-    def __init__(self, itos=None, stoi=None, stof=None):
+    """An object that does the word to index
+
+    Attributes:
+        itos (List[str]): A list that maps index to label.
+        stoi (Dict[str, int]): A dict that maps label to index.
+        stof (Dict[str, int]): A dict that maps label to frequency.
+    """
+
+    def __init__(
+        self,
+        itos: List[str] = None,
+        stoi: Dict[str, int] = None,
+        stof: Dict[str, int] = None,
+    ):
         self.itos = itos
         self.stoi = stoi
         self.stof = stof
@@ -19,7 +34,17 @@ class LabelEncoder:
         self.fitted = False
         self.logger = getlogger(__name__)
 
-    def fit(self, y, special_tokens=[]):
+    def fit(
+        self, y: List[str], special_tokens: List[str] = []
+    ) -> "LabelEncoder":
+        """Build the word indexes according to corpus. If it was fitted
+            before, then it will do nothing.
+
+        Args:
+            y (List[str]): The list of label.
+            special_tokens(List[str]): The list of labels that will be
+                excluded when encoding.
+        """
         if self.fitted:
             self.logger.debug("The encoder has already been fitted")
             return self
@@ -37,11 +62,50 @@ class LabelEncoder:
         return self
 
     def encode(self, y: List[str]):
+        """Encoding a list of labels into a list of indexes
+
+        Args:
+            y (List[str]): The sentence to encode.
+
+        Returns:
+            List[int]: The list of word indexes
+        """
+        if not self.fitted:
+            raise NotFittedError("Encoder is not fitted")
         y = flatten_2d(y)
         return [self.stoi[token] for token in y]
 
     def decode(self, y):
+        """Decoding a list of indexes into a list of labels
+
+        Args:
+            y (List[int]): The sequence to decode.
+
+        Returns:
+            List[str]: The decoded list of class labels
+        """
+        if not self.fitted:
+            raise NotFittedError("Encoder is not fitted")
+        y = flatten_2d(y)
         return [self.itos[idx] for idx in y]
+
+    def dump(self, filename: str):
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(filename: str):
+        with open(filename, "rb") as f:
+            encoder = pickle.load(f)
+        return encoder
+
+    def __getstate__(self):
+        return {"stof": self.stof, "itos": self.itos}
+
+    def __setstate__(self, d):
+        self.stof = d["stof"]
+        self.itos = d["itos"]
+        self.stoi = {word: idx for idx, word in enumerate(self.itos)}
 
 
 class TextEncoder(LabelEncoder):
@@ -82,3 +146,26 @@ class TextEncoder(LabelEncoder):
                 self.eos_token,
             ],
         )
+
+    def __getstate__(self):
+        d = super().__getstate__()
+        d["pad_token"] = self.pad_token
+        d["unk_token"] = self.unk_token
+        d["sos_token"] = self.sos_token
+        d["eos_token"] = self.eos_token
+        return d
+
+    def __setstate__(self, d):
+        super().__setstate__(d)
+        self.pad_token = d.get("pad_token")
+        self.unk_token = d.get("unk_token")
+        self.sos_token = d.get("sos_token")
+        self.eos_token = d.get("eos_token")
+        if self.pad_token:
+            self.pad_id = self.stoi[self.pad_token]
+        if self.unk_token:
+            self.unk_id = self.stoi[self.unk_token]
+        if self.sos_token:
+            self.sos_id = self.stoi[self.sos_token]
+        if self.eos_token:
+            self.eos_id = self.stoi[self.eos_token]

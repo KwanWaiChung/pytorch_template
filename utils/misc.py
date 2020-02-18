@@ -57,7 +57,7 @@ def pad(
 
 
 def flatten_2d(y):
-    """Convert columns or 1d list (unchange) to 1d list"
+    """Convert columns to 1d list. Unchange if input is a 1d list."
 
     Args:
         y (list): The list to convert.

@@ -233,3 +233,6 @@ class Field:
                     examples += list(getattr(dataset, name))
         encoder.fit(examples)
         return encoder
+
+    def __eq__(self, obj):
+        return dir(self) == dir(obj)

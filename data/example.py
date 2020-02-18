@@ -49,6 +49,7 @@ class Example:
                     f"Specified key {name} was not found in the input data."
                 )
             setattr(ex, name, data[name])
+        return ex
 
     def preprocess(self, fields: Dict[str, Field]):
         """Preprocess the fields of this example.
@@ -63,3 +64,6 @@ class Example:
         for name, field in fields.items():
             setattr(self, name, field.preprocess(getattr(self, name)))
         return self
+
+    def __eq__(self, obj):
+        return dir(self) == dir(obj)

@@ -1,7 +1,7 @@
 from time import sleep
 from random import random
 from ..data.field import Field
-from ..data.dataset import Dataset
+from ..data.dataset import Dataset, TabularDataset
 from ..data.example import Example
 import os
 import spacy
@@ -94,11 +94,129 @@ def test_split():
 
     examples = [Example.fromlist(example, fields) for example in data]
     ds = Dataset(examples, fields)
-    train_examples, test_examples, val_examples = ds.split(
+    train_ds, test_ds, val_ds = ds.split(
         [0.8, 0.1, 0.1], stratify_field="label"
     )
 
     # check portion
-    assert len(train_examples) == len(data) * 0.8
-    assert len(test_examples) == len(data) * 0.1
-    assert len(val_examples) == len(data) * 0.1
+    assert len(train_ds.examples) == len(data) * 0.8
+    assert len(test_ds.examples) == len(data) * 0.1
+    assert len(val_ds.examples) == len(data) * 0.1
+
+
+def test_read_csv():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=True,
+        fix_length=150,
+        batch_first=True,
+    )
+    label = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=False,
+        is_target=True,
+        to_lower=False,
+    )
+    examples = TabularDataset.read_csv(
+        path=f"{os.path.dirname(os.path.realpath(__file__))}/train.csv",
+        fields={"comment_text": text, "toxic": label, "severe_toxic": label},
+        params={"encoding": "utf-8"},
+    )
+    assert type(examples[0].comment_text) == str
+    assert type(examples[0].toxic) == int
+    assert type(examples[0].severe_toxic) == int
+
+
+def test_read_json():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=True,
+        fix_length=150,
+        batch_first=True,
+    )
+    label = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=False,
+        is_target=True,
+        to_lower=False,
+    )
+    examples = TabularDataset.read_json(
+        path=f"{os.path.dirname(os.path.realpath(__file__))}/reviews.json",
+        fields={"text": text, "stars": label},
+        params={"encoding": "utf-8"},
+    )
+    assert type(examples[0].text) == str
+    assert type(examples[0].stars) == int
+
+
+def test_tabular_dataset_with_csv():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=True,
+        fix_length=150,
+        batch_first=True,
+    )
+    label = Field(is_sequential=False, is_target=True, to_lower=False)
+    ds = TabularDataset(
+        path=f"{os.path.dirname(os.path.realpath(__file__))}/train.csv",
+        format="csv",
+        fields={"comment_text": text, "toxic": label, "severe_toxic": label},
+        reader_params={"encoding": "utf-8"},
+    )
+    for example in ds:
+        assert type(example.comment_text) == list
+        assert type(example.toxic) == int
+        assert type(example.severe_toxic) == int
+
+
+def test_tabular_dataset_with_json():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=True,
+        fix_length=150,
+        batch_first=True,
+    )
+    label = Field(is_sequential=False, is_target=True, to_lower=False)
+    ds = TabularDataset(
+        path=f"{os.path.dirname(os.path.realpath(__file__))}/reviews.json",
+        format="json",
+        fields={"text": text, "stars": label},
+        reader_params={"encoding": "utf-8"},
+    )
+    for example in ds:
+        assert type(example.text) == list
+        assert type(example.stars) == int
+
+
+def sort_key(example):
+    return example.comment_text
+
+
+def test_pickle():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=True,
+        fix_length=150,
+        batch_first=True,
+    )
+    label = Field(is_sequential=False, is_target=True, to_lower=False)
+    ds = TabularDataset(
+        path=f"{os.path.dirname(os.path.realpath(__file__))}/train.csv",
+        format="csv",
+        fields={"comment_text": text, "toxic": label, "severe_toxic": label},
+        reader_params={"encoding": "utf-8"},
+        sort_key=sort_key,
+    )
+
+    examples = ds.examples
+    fields = ds.fields
+    ds.dump("ds.pickle")
+    ds = Dataset.load("ds.pickle")
+    assert ds.examples == examples
+    assert ds.fields == fields
+    assert ds.sort_key == sort_key

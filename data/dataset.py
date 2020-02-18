@@ -1,8 +1,8 @@
 import torch.utils.data
-import random
 import pandas as pd
 import json
 import os
+import pickle
 from multiprocessing.pool import Pool
 from time import time
 from typing import Union, List, Callable, Dict, Any
@@ -47,9 +47,9 @@ class Dataset(torch.utils.data.Dataset):
 
     def __init__(
         self,
-        examples: List[Example],
+        examples: List["Example"],
         fields: Dict[str, "Field"],
-        filter_pred: Callable[[Example], bool] = None,
+        filter_pred: Callable[["Example"], bool] = None,
         sort_key: Callable[["Example"], int] = None,
         n_jobs: int = -1,
     ):
@@ -64,6 +64,8 @@ class Dataset(torch.utils.data.Dataset):
             filter_pred (Callable[[Example], bool]): A predicate function
                 that filters out the examples. Only the examples of which
                 the predicate evalutes to `True`will be used. Default is None.
+            sort_key (Callable[[Example]]): A key to use for sorting examples.
+                Usually its the length of some attributes.
             n_jobs (int): The number of jobs to use for the computation.
                 -1 means using all processors. Default: -1.
         """
@@ -91,6 +93,28 @@ class Dataset(torch.utils.data.Dataset):
             self.examples = [
                 example for example in self.examples if filter_pred(example)
             ]
+
+    @classmethod
+    def fromProcessedExamples(
+        cls,
+        examples: List["Example"],
+        fields: Dict[str, "Field"],
+        sort_key: Callable[["Example"], int] = None,
+    ):
+        """
+        Args:
+            examples (List[Example]): A list holding all the unprocessed
+                examples. Each example will have attributes as indicated
+                in the keys of `fields`.
+            fields (Dict[str, Feild]): A dict that maps the name of
+                each attribute/columns of the examples to a Field, which
+                specified how to process them afterwards.
+            sort_key (Callable[[Example]]): A key to use for sorting examples.
+                Usually its the length of some attributes.
+        """
+        ds = Dataset(examples=[], fields=fields, sort_key=sort_key)
+        ds.examples = examples
+        return ds
 
     def split(
         self,
@@ -138,7 +162,27 @@ class Dataset(torch.utils.data.Dataset):
             else None,
             random_state=seed,
         )
-        return train_examples, test_examples, val_examples
+
+        train_dataset = Dataset.fromProcessedExamples(
+            train_examples, self.fields, self.sort_key
+        )
+        test_dataset = Dataset.fromProcessedExamples(
+            test_examples, self.fields, self.sort_key
+        )
+        val_dataset = Dataset.fromProcessedExamples(
+            val_examples, self.fields, self.sort_key
+        )
+        return train_dataset, test_dataset, val_dataset
+
+    def dump(self, filename: str):
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(filename: str):
+        with open(filename, "rb") as f:
+            encoder = pickle.load(f)
+        return encoder
 
     def __getitem__(self, i):
         return self.examples[i]
@@ -155,6 +199,18 @@ class Dataset(torch.utils.data.Dataset):
             for x in self.examples:
                 yield getattr(x, attr)
 
+    def __getstate__(self):
+        return {
+            "examples": self.examples,
+            "fields": self.fields,
+            "sort_key": self.sort_key,
+        }
+
+    def __setstate__(self, d):
+        self.examples = d["examples"]
+        self.fields = d["fields"]
+        self.sort_key = d["sort_key"]
+
 
 class TabularDataset(Dataset):
     """Defines a Dataset of columns stored in CSV or JSON format."""
@@ -166,6 +222,9 @@ class TabularDataset(Dataset):
         fields: Dict[str, "Field"],
         reader_params: Dict[str, Any],
         postprocessor: Callable[[Any], List[Dict]] = None,
+        filter_pred: Callable[[Example], bool] = None,
+        sort_key: Callable[["Example"], int] = None,
+        n_jobs: int = -1,
     ):
         """Create a Dataset given the path, file format, and fields.
 
@@ -181,6 +240,13 @@ class TabularDataset(Dataset):
             postprocessor (Callable): Apply to convert the format to List
                 of Dict after reading the file from pandas.read_csv() or
                 json.load().
+            filter_pred (Callable[[Example], bool]): A predicate function
+                that filters out the examples. Only the examples of which
+                the predicate evalutes to `True`will be used. Default is None.
+            sort_key (Callable[[Example]]): A key to use for sorting examples.
+                Usually its the length of some attributes.
+            n_jobs (int): The number of jobs to use for the computation.
+                -1 means using all processors. Default: -1.
         """
         if not os.path.isfile(path):
             raise ValueError(f"The path '{path}' doesn't exist.")
@@ -190,29 +256,49 @@ class TabularDataset(Dataset):
                 f"Format must be one of 'csv' or 'json', received '{format}'"
             )
         reader = {"csv": self.read_csv, "json": self.read_json}[format]
-        examples = reader(path, reader_params, postprocessor)
+        examples = reader(path, reader_params, fields, postprocessor)
+        super().__init__(examples, fields, filter_pred, sort_key, n_jobs)
 
-        @classmethod
-        def read_csv(
-            path: str,
-            params: Dict[str, Any],
-            postprocessor: Callable[[Any], List[Dict]] = None,
-        ) -> List[Dict[str, Any]]:
-            """Read csv and return list of dict of columns"""
-            df = pd.read_csv(path, **params)
-            if postprocessor:
-                df = postprocessor(df)
-            return df.to_dict("records")
+    @staticmethod
+    def read_csv(
+        path: str,
+        params: Dict[str, Any],
+        fields: Dict[str, "Field"],
+        postprocessor: Callable[
+            [List[Dict[str, Any]]], List[Dict[str, Any]]
+        ] = None,
+    ) -> List["Example"]:
+        """Read csv and return list of dict of attributes to values
 
-        @classmethod
-        def read_json(
-            path: str,
-            params: Dict[str, Any],
-            postprocessor: Callable[[Any], List[Dict]] = None,
-        ) -> List[Dict[str, Any]]:
-            """Read json and return list of dict of columns"""
-            with open(path, **params) as f:
-                j = json.load(f)
-            if postprocessor:
-                j = postprocessor(j)
-            return j
+        Args:
+            path (str): Path of the csv file.
+            params (Dict[str, Any]): Parameters for pd.read_csv method
+            postprocessor (Callable): postprocess the list of dicts
+        """
+        df = pd.read_csv(path, **params)
+        df = df.to_dict("records")
+        if postprocessor:
+            df = postprocessor(df)
+        df = [Example.fromdict(d, fields) for d in df]
+        return df
+
+    @staticmethod
+    def read_json(
+        path: str,
+        params: Dict[str, Any],
+        fields: Dict[str, "Field"],
+        postprocessor: Callable[[Any], List[Dict]] = None,
+    ) -> List["Example"]:
+        """Read json and return list of dict of attributes to values
+
+        Args:
+            path (str): Path of the json file.
+            params (Dict[str, Any]): Parms for the open() function.
+            postprocessor (Callable): postprocess the list of dicts
+        """
+        with open(path, "r", **params) as f:
+            j = json.load(f)
+        if postprocessor:
+            j = postprocessor(j)
+        j = [Example.fromdict(d, fields) for d in j]
+        return j

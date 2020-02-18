@@ -1,6 +1,9 @@
 from ..utils.encoder import LabelEncoder, TextEncoder
 from .mock_handler import MockLoggingHandler
 from ..utils.logger import getlogger
+from ..exceptions.NotFittedError import NotFittedError
+import pytest
+import os
 
 
 handler = MockLoggingHandler(level="DEBUG")
@@ -36,6 +39,36 @@ def test_label_encoder_with_2d_vector():
     )
     assert len(set([temp[0] for temp in y])) == len(encoder.stoi)
     assert encoder.decode(encoder.encode(y)) == [temp[0] for temp in y]
+
+
+def test_label_encoder_encode_not_fitted():
+    encoder = LabelEncoder()
+    with pytest.raises(NotFittedError) as e:
+        encoder.encode(["apple"])
+    assert "Encoder is not fitted" in str(e.value)
+
+
+def test_label_encoder_decode_not_fitted():
+    encoder = LabelEncoder()
+    with pytest.raises(NotFittedError) as e:
+        encoder.decode([1])
+    assert "Encoder is not fitted" in str(e.value)
+
+
+def test_label_encoder_pickle():
+    encoder = LabelEncoder()
+    y = ["apple", "orange", "pears", "apple", "watermellon", "orange", "apple"]
+    encoder.fit(y)
+    stoi = encoder.stoi
+    stof = encoder.stof
+    itos = encoder.itos
+    encoder.dump("test_encoder.pickle")
+
+    new_encoder = LabelEncoder.load("test_encoder.pickle")
+    assert new_encoder.stoi == stoi
+    assert new_encoder.stof == stof
+    assert new_encoder.itos == itos
+    os.remove("test_encoder.pickle")
 
 
 def test_text_encoder():
@@ -117,3 +150,88 @@ def test_text_encoder():
     assert "<pad>" == encoder.itos[encoder.pad_id]
 
     assert encoder.stof["apple"] == 6, "The word frequency is incorrect"
+
+
+def test_text_encoder_pickle():
+    encoder = TextEncoder(
+        sos_token="<sos>",
+        eos_token="<eos>",
+        pad_token="<pad>",
+        unk_token="<unk>",
+    )
+    y = [
+        [
+            "apple",
+            "orange",
+            "pears",
+            "apple",
+            "watermellon",
+            "orange",
+            "apple",
+        ],
+        [
+            "apple",
+            "orange",
+            "pears",
+            "apple",
+            "watermellon",
+            "orange",
+            "apple",
+        ],
+    ]
+    encoder.fit(y)
+    stoi = encoder.stoi
+    stof = encoder.stof
+    itos = encoder.itos
+    pad_id = encoder.pad_id
+    encoder.dump("test_encoder.pickle")
+
+    new_encoder = TextEncoder.load("test_encoder.pickle")
+    assert new_encoder.stoi == stoi
+    assert new_encoder.stof == stof
+    assert new_encoder.itos == itos
+    assert new_encoder.sos_token == "<sos>"
+    assert new_encoder.eos_token == "<eos>"
+    assert new_encoder.pad_token == "<pad>"
+    assert new_encoder.unk_token == "<unk>"
+    assert new_encoder.pad_id == pad_id
+    os.remove("test_encoder.pickle")
+
+    encoder = TextEncoder(
+        sos_token="<sos>", pad_token="<pad>", unk_token="<unk>"
+    )
+    y = [
+        [
+            "apple",
+            "orange",
+            "pears",
+            "apple",
+            "watermellon",
+            "orange",
+            "apple",
+        ],
+        [
+            "apple",
+            "orange",
+            "pears",
+            "apple",
+            "watermellon",
+            "orange",
+            "apple",
+        ],
+    ]
+    encoder.fit(y)
+    stoi = encoder.stoi
+    stof = encoder.stof
+    itos = encoder.itos
+    encoder.dump("test_encoder.pickle")
+
+    new_encoder = TextEncoder.load("test_encoder.pickle")
+    assert new_encoder.stoi == stoi
+    assert new_encoder.stof == stof
+    assert new_encoder.itos == itos
+    assert new_encoder.sos_token == "<sos>"
+    assert new_encoder.eos_token is None
+    assert new_encoder.pad_token == "<pad>"
+    assert new_encoder.unk_token == "<unk>"
+    os.remove("test_encoder.pickle")

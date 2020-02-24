@@ -1,5 +1,6 @@
 from ..data.batcher import Batcher
 from multiprocessing.pool import Pool
+import math
 
 
 class Iterator:
@@ -58,3 +59,6 @@ class Iterator:
                 else:
                     result.append(batch)
             yield result
+
+    def __len__(self):
+        return math.ceil(len(self.dataset) / self.batch_size)

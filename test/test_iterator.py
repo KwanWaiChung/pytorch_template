@@ -161,3 +161,69 @@ def test_sort_within_batch():
     for i, (e, e_length, f, f_length) in enumerate(iterator):
         for j in range(e.shape[0] - 1):
             assert e_length[j] >= e_length[j + 1]
+
+
+def test_iteration_len():
+    data = [
+        [
+            "Some english sentence",
+            "A french tranlsation maybe but you got the idea",
+        ],
+        ["Hello world, its enlish", "bon appeti"],
+        [
+            "Some english sentence",
+            "A french tranlsation maybe but you got the idea",
+        ],
+        ["Hello world, its enlish", "bon appeti"],
+        [
+            "Some english sentence",
+            "A french tranlsation maybe but you got the idea",
+        ],
+        ["Hello world, its enlish", "bon appeti"],
+        [
+            "Some english sentence",
+            "A french tranlsation maybe but you got the idea",
+        ],
+        ["Hello world, its enlish", "bon appeti"],
+        [
+            "Some english sentence",
+            "A french tranlsation maybe but you got the idea",
+        ],
+        ["Hello world, its enlish", "bon appeti"],
+    ]
+    eng_field = Field(
+        is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
+    )
+    fre_field = Field(
+        is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
+    )
+    fields = {"eng": eng_field, "fre": fre_field}
+    examples = [Example.fromlist(example, fields) for example in data]
+    ds = Dataset(examples, fields, sort_key=lambda x: len(x.eng))
+    eng_encoder = TextEncoder(
+        sos_token="<sos>",
+        eos_token="<eos>",
+        pad_token="<pad>",
+        unk_token="<unk>",
+    )
+    fre_encoder = TextEncoder(
+        sos_token="<sos>",
+        eos_token="<eos>",
+        pad_token="<pad>",
+        unk_token="<unk>",
+    )
+    eng_field.build_vocab(eng_encoder, ds)
+    fre_field.build_vocab(fre_encoder, ds)
+
+    iterator = Iterator(
+        dataset=ds,
+        batch_size=4,
+        seed=0,
+        sort_within_batch=False,
+        to_shuffle=False,
+    )
+
+    length = len(iterator)
+    for i, (e, f) in enumerate(iterator, 1):
+        pass
+    assert i == length

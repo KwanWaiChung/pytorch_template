@@ -220,3 +220,4 @@ def test_pickle():
     assert ds.examples == examples
     assert ds.fields == fields
     assert ds.sort_key == sort_key
+    os.remove("ds.pickle")

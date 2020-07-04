@@ -36,6 +36,7 @@ def download_from_googledrive(file_id: str, dst_path: str, unzip: bool = True):
         logger.info(f"Unzipping {dst_path}...")
         with zipfile.ZipFile(dst_path, "r") as z:
             z.extractall(dst_dir)
+        # remove the zip too
         os.remove(dst_path)
         logger.info(f"Finished unzipping.")
 

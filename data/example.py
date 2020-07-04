@@ -66,4 +66,4 @@ class Example:
         return self
 
     def __eq__(self, obj):
-        return dir(self) == dir(obj)
+        return self.__dict__ == obj.__dict__

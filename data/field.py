@@ -13,17 +13,17 @@ def naive_tokenizer(s: str) -> List[str]:
 
 
 class Field:
-    """ Defines a processor that converts data to tensor
+    """A processor that defines how to convert raw data to tensor.
 
     Attributes:
-        cleaning: A `Pipeline` that will be applied to the raw inputs
+        cleaning: A `Pipeline` object that will be applied to the raw inputs
             of each example. Default: None.
-        preprocessing: A `Pipeline` that will be applied to the inputs
+        preprocessing: A `Pipeline` object that will be applied to the inputs
             of each example after tokenizing. Default: None.
-        postprocessing: A `Pipeline` that will be applied to the inputs
+        postprocessing: A `Pipeline` object that will be applied to the inputs
             of each example after numericalizing but before changing to
             tensors. Default: None.
-        is_target: True if the data is the target label. Default: False.
+        is_target: True if the feature is the target label. Default: False.
         tokenizer: The function used to tokenize strings.
         to_lower: True if lower the text in this field. Default: False.
         is_sequential: True if the data is sequential or a string.
@@ -42,6 +42,7 @@ class Field:
         pad_first: If True, do the padding at the beginning. Default: False.
         truncate_first: If True, do the truncation at the beginning.
             Default: False.
+
     """
 
     def __init__(
@@ -137,7 +138,7 @@ class Field:
                 will just return the List or torch.Tensor.
         """
         batch = self._pad(batch)
-        batch = self._numericalize(batch)
+        batch = self._numericalize_batch(batch)
         if self.include_lengths:
             batch, lengths = batch
             if to_tensor:
@@ -189,7 +190,7 @@ class Field:
             return (padded, lengths)
         return padded
 
-    def _numericalize(
+    def _numericalize_batch(
         self,
         batch: Union[List[List[str]], Tuple[List[List[str]], List[List[int]]]],
     ):
@@ -203,10 +204,8 @@ class Field:
             batch, lengths = batch
 
         if self.is_target:
-            batch = [
-                [self.encoder.stoi[token] for token in example]
-                for example in batch
-            ]
+            # assume batch is a List of str(labels)
+            batch = [[self.encoder.stoi[example]] for example in batch]
         else:
             batch = [
                 [
@@ -235,4 +234,4 @@ class Field:
         return encoder
 
     def __eq__(self, obj):
-        return dir(self) == dir(obj)
+        return self.__dict__ == obj.__dict__

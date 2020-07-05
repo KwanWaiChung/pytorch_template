@@ -1,7 +1,7 @@
 from ..data.example import Example
 from ..data.field import Field
 from ..data.dataset import Dataset
-from ..utils.encoder import TextEncoder
+from ..utils.encoder import TextEncoder, LabelEncoder
 import os
 
 
@@ -175,6 +175,31 @@ def test_build_vocab_with_two_dataset():
         "hate": 2,
         "apple": 1,
     }
+
+
+def test_numericalize():
+    data = [["I love iPhone", "pos"], ["I hate iPhone", "neg"]]
+    text = Field(is_sequential=True)
+    label = Field(is_sequential=False, is_target=True)
+
+    text_encoder = TextEncoder()
+    label_encoder = LabelEncoder()
+    fields = {"text": text, "label": label}
+    examples = [Example.fromlist(example, fields) for example in data]
+
+    ds = Dataset(examples, fields)
+    text.build_vocab(text_encoder, ds)
+    label.build_vocab(label_encoder, ds)
+
+    text_digit = text._numericalize_batch(ds.text)
+    # decode return [label]
+    assert ds[0].text == text_encoder.decode(text_digit[0])
+    assert ds[1].text == text_encoder.decode(text_digit[1])
+
+    label_digit = label._numericalize_batch(ds.label)
+    # decode return [label]
+    assert data[0][1] == label_encoder.decode(label_digit[0])[0]
+    assert data[1][1] == label_encoder.decode(label_digit[1])[0]
 
 
 def test_process():

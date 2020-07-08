@@ -5,6 +5,22 @@ Transform = namedtuple("Transform", ["name", "transform"])
 
 
 class Pipeline:
+    """Defines a data processing pipeline
+
+    Examples:
+        >>> def lower(s: str) -> str:
+                return s.lower()
+
+        >>> def trim(s: str) -> str:
+                return s[:3]
+        >>> p = Pipeline([("lower", lower), ("trim", trim)])
+        >>> p("HELLO")
+        "hel"
+        >>> p(["HELLO", "HEllo", "hello"])
+        ["hel", "hel", "hel"]
+
+    """
+
     def identity(s):
         return s
 
@@ -12,7 +28,8 @@ class Pipeline:
         """
         Args:
             steps (List): List of (name, transform) tuples where `transform`
-                is a callable that receives a str and return a str
+                is a callable that receives a str and return a str.
+
         """
         if steps:
             self.steps = [Transform(*step) for step in steps]

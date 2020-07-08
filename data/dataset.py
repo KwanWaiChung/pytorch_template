@@ -5,7 +5,7 @@ import os
 import pickle
 from multiprocessing.pool import Pool
 from time import time
-from typing import Union, List, Callable, Dict, Any
+from typing import Union, List, Callable, Dict, Any, Tuple
 from ..utils.misc import get_split_ratio
 from .example import Example
 from ..utils.logger import getlogger
@@ -43,6 +43,7 @@ class Dataset(torch.utils.data.Dataset):
             specified how to process them afterwards.
         sort_key (Callable[[Example]]): A key to use for sorting examples.
             Usually its the length of some attributes.
+
     """
 
     def __init__(
@@ -68,6 +69,7 @@ class Dataset(torch.utils.data.Dataset):
                 Usually its the length of some attributes.
             n_jobs (int): The number of jobs to use for the computation.
                 -1 means using all processors. Default: -1.
+
         """
         if n_jobs == -1:
             p = Pool()
@@ -103,14 +105,17 @@ class Dataset(torch.utils.data.Dataset):
     ):
         """
         Args:
-            examples (List[Example]): A list holding all the unprocessed
-                examples. Each example will have attributes as indicated
-                in the keys of `fields`.
+            examples (List[Example]): A list holding all the preprocessed
+                `Example` object.
             fields (Dict[str, Feild]): A dict that maps the name of
                 each attribute/columns of the examples to a Field, which
                 specified how to process them afterwards.
             sort_key (Callable[[Example]]): A key to use for sorting examples.
                 Usually its the length of some attributes.
+
+        Returns:
+            Dataset object.
+
         """
         ds = Dataset(examples=[], fields=fields, sort_key=sort_key)
         ds.examples = examples
@@ -121,8 +126,8 @@ class Dataset(torch.utils.data.Dataset):
         split_ratio: Union[List[float], float, int],
         stratify_field: str = None,
         seed: int = 0,
-    ):
-        """Create train-test(-valid) splits from the examples
+    ) -> Tuple["Dataset", "Dataset"]:
+        """Create train-test(-valid) splits from the examples.
 
         Args:
             split_ratio (Union[List[float], float, int]): if float, should be
@@ -133,7 +138,20 @@ class Dataset(torch.utils.data.Dataset):
                 If int, represents the absolute number of train samples.
             stratify_field (bool): The name of the examples `Field` to
                 stratify.
-            seed: The seed for splitting.
+            seed (int): The seed for splitting.
+
+        Returns:
+            Tuple(Dataset, Dataset): The tuple of train, test, val
+                (if len(split_ratio) == 3) `Dataset` objects.
+
+        Raises:
+            ValueError: if stratify_field not in self.fields.
+
+        Examples:
+            >>> ds = Dataset(examples, fields)
+            >>> train_ds, test_ds, val_ds = ds.split(
+                    [0.8, 0.1, 0.1], stratify_field="label"
+                )
         """
         if stratify_field and stratify_field not in self.fields:
             raise ValueError(
@@ -175,6 +193,17 @@ class Dataset(torch.utils.data.Dataset):
         return train_dataset, test_dataset, val_dataset
 
     def dump(self, filename: str):
+        """
+        Store the dataset object to avoid preprocessing again.
+
+        Args:
+            filename: The filename for the binary pickle file.
+
+        Examples:
+            >>> ds = Dataset(examples, fields)
+            ds.dump("ds.pickle")
+            ds = Dataset.load("ds.pickle")
+        """
         with open(filename, "wb") as f:
             pickle.dump(self, f)
 
@@ -245,8 +274,27 @@ class TabularDataset(Dataset):
                 the predicate evalutes to `True`will be used. Default is None.
             sort_key (Callable[[Example]]): A key to use for sorting examples.
                 Usually its the length of some attributes.
-            n_jobs (int): The number of jobs to use for the computation.
+            n_jobs (int): The number of jobs to use for the preprocessing.
                 -1 means using all processors. Default: -1.
+
+        Raises:
+            ValueError: If `path` doesn't exist.
+            ValueError: If `format` is not 'csv' or 'json'.
+
+        Examples:
+            >>> text = Field(
+                    is_sequential=True,
+                    to_lower=True,
+                    fix_length=150,
+                    batch_first=True,
+                )
+                label = Field(is_sequential=False, is_target=True)
+                ds = TabularDataset(
+                    path="train.csv",
+                    format="csv",
+                    fields={"comment_text": text, "toxic": label},
+                    reader_params={"encoding": "utf-8"},
+                )
         """
         if not os.path.isfile(path):
             raise ValueError(f"The path '{path}' doesn't exist.")

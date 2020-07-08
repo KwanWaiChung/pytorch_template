@@ -90,8 +90,9 @@ class Field:
         self.truncate_first = truncate_first
 
     def preprocess(self, s: Union[str, List[str]]) -> Union[str, List[str]]:
-        """Preprocess a single example using this field, tokenizing if needed
+        """Preprocess a single example using this field, tokenizing if needed.
 
+        Clean -> tokenize -> lower -> stopwords -> user defined preprocess
         The input will first pass to `cleaning`, like removing html tags.
         Then if `is_sequential` is True, it will be tokenized.
         Next, it will be converted to lower case (if needed).
@@ -101,10 +102,16 @@ class Field:
         Args:
             s: It can be a sentence (str) or sequence of
                 tokens (List[str])
+
         Returns:
             str or List[str]: List of str will be returned if either
                 `is_sequential` is True or the input was already a sequence
                 of tokens.
+
+        Raises:
+            TypeError: if input is a list but is_sequential is True and
+                using a tokenizer.
+
         """
         if self.cleaning:
             s = self.cleaning(s)
@@ -125,17 +132,18 @@ class Field:
         return s
 
     def process(self, batch: List[List[str]], to_tensor=True) -> torch.Tensor:
-        """Do the padding and the numericalizing to a list of examples
+        """Do the padding and the numericalizing to a list of examples.
 
         Args:
             batch: A list of examples, where each example is a list of tokens.
             to_tensor: If True, a tensor will be returned. Otherwise, it will
-                be Lists. Default: True.
+                return List. Default: True.
 
         Returns:
-             Tuple[List or torch.Tensor): if `include_lengths` is True, the
+             Tuple[List or torch.Tensor): If `include_lengths` is True, the
                 length will be returned together in a tuple. Otherwise, it
                 will just return the List or torch.Tensor.
+
         """
         batch = self._pad(batch)
         batch = self._numericalize_batch(batch)
@@ -160,7 +168,9 @@ class Field:
             batch: A list of examples, where each example is a list of tokens.
 
         Returns:
-            List[List[str]]: The padded batch of examples.
+            List[List[str]]: The batch of padded examples. If `include_lengths`
+                is True, the length will be returned together in a tuple.
+
         """
         if not self.is_sequential:
             return batch
@@ -193,7 +203,19 @@ class Field:
     def _numericalize_batch(
         self,
         batch: Union[List[List[str]], Tuple[List[List[str]], List[List[int]]]],
-    ):
+    ) -> List[List[int]]:
+        """Convert a List of examples for str to word index.
+
+        Args:
+            batch: A list of examples, where each example is a list of tokens.
+                if `include_lengths` is True, it will be Tuple(examples,
+                lengths).
+
+        Returns:
+            List[List[str]]: The batch of padded examples. If `include_lengths`
+                is True, the length will be returned together in a tuple.
+
+        """
         if not self.to_numericalize:
             return batch
         if not self.encoder:
@@ -224,6 +246,18 @@ class Field:
         encoder: Union[LabelEncoder, TextEncoder],
         *datasets: List["Dataset"],
     ):
+        """Build the word to index table.
+
+        Args:
+            encoder: The encoder object to build the index table.
+            datasets: The attributes correspond to this `Field` of those
+                Dataset` object(s) will be used to build the index table.
+
+        Returns:
+            Encoder: The fitted `Encoder`  object. Notice that the `Encoder`
+                object will be changed in place after fitting.
+
+        """
         self.encoder = encoder
         examples = []
         for dataset in datasets:

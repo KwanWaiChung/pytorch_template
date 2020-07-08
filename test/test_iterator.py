@@ -82,7 +82,7 @@ def test_basic_iteration():
     for i, (e, f) in enumerate(iterator):
         assert type(e) == torch.Tensor
         assert type(f) == torch.Tensor
-        if i == 2:
+        if i == 2:  # last batch
             assert e.shape[0] == 2
             assert f.shape[0] == 2
         else:

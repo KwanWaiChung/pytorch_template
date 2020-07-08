@@ -12,14 +12,13 @@ class Batcher:
     Examples are not processed (pad and numericalize) yet.
 
     Attributes:
-        examples(List[Example]): The full List of examples.
+        dataset (Dataset): The dataset object which contains the examples
+            for batching.
         batch_size: Batch size.
         seed: The seed for random shuffling.
-        sort_key: A key to use for sorting examples. Usually
-            its the length of some attributes.
         sort_within_batch: Whether to sort (in descending order)
             within each batch.
-        to_shuffle: Whether to shuffle examples between epochs.
+        to_shuffle: If True, shuffle the data for every epoch.
     """
 
     def __init__(
@@ -39,7 +38,7 @@ class Batcher:
                 its the length of some attributes.
             sort_within_batch: Whether to sort (in descending order)
                 within each batch.
-            to_shuffle: Whether to shuffle examples between epochs.
+            to_shuffle: If True, shuffle the data for every epoch.
         """
         self.dataset = dataset
         self.batch_size = batch_size
@@ -68,6 +67,8 @@ class Batcher:
 
 
 class BucketBatcher(Batcher):
+    """Group examples with similar length in the same mini-batch"""
+
     def __iter__(self):
         if not self.sort_within_batch:
             return super().__iter__()

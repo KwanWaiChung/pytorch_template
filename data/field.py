@@ -268,4 +268,8 @@ class Field:
         return encoder
 
     def __eq__(self, obj):
-        return self.__dict__ == obj.__dict__
+        #  return self.__dict__ == obj.__dict__
+        exclude_fields = ["cleaning", "preprocessing", "postprocessing"]
+        return {
+            k: v for k, v in self.__dict__.items() if k not in exclude_fields
+        } == {k: v for k, v in obj.__dict__.items() if k not in exclude_fields}

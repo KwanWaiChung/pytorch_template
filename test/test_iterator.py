@@ -3,20 +3,7 @@ from ..data.field import Field
 from ..data.example import Example
 from ..data.dataset import Dataset
 from ..utils.encoder import TextEncoder
-import pytest
 import torch
-
-
-#  def test_nonexist_field_name():
-#      field = Field(
-#          is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
-#      )
-#      fields = [("text", field)]
-#      examples = [Example.fromlist(["Hello world"], fields)]
-#      ds = Dataset(examples, dict(fields))
-#      with pytest.raises(ValueError) as e:
-#          iterator = Iterator(["non_exist"], ds, 4, 0, True, True)
-#      assert str(e.value) == "The dataset has no field named `non_exist`"
 
 
 def test_basic_iteration():
@@ -56,20 +43,20 @@ def test_basic_iteration():
     fields = {"eng": eng_field, "fre": fre_field}
     examples = [Example.fromlist(example, fields) for example in data]
     ds = Dataset(examples, fields, sort_key=lambda x: len(x.eng))
-    eng_encoder = TextEncoder(
+    eng_encoder = eng_field.build_vocab(
+        ds,
         sos_token="<sos>",
         eos_token="<eos>",
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    fre_encoder = TextEncoder(
+    fre_encoder = fre_field.build_vocab(
+        ds,
         sos_token="<sos>",
         eos_token="<eos>",
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    eng_field.build_vocab(eng_encoder, ds)
-    fre_field.build_vocab(fre_encoder, ds)
 
     iterator = Iterator(
         dataset=ds,
@@ -135,20 +122,20 @@ def test_sort_within_batch():
     fields = {"eng": eng_field, "fre": fre_field}
     examples = [Example.fromlist(example, fields) for example in data]
     ds = Dataset(examples, fields, sort_key=lambda x: len(x.eng))
-    eng_encoder = TextEncoder(
+    eng_encoder = eng_field.build_vocab(
+        ds,
         sos_token="<sos>",
         eos_token="<eos>",
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    fre_encoder = TextEncoder(
+    fre_encoder = fre_field.build_vocab(
+        ds,
         sos_token="<sos>",
         eos_token="<eos>",
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    eng_field.build_vocab(eng_encoder, ds)
-    fre_field.build_vocab(fre_encoder, ds)
 
     iterator = Iterator(
         dataset=ds,
@@ -200,20 +187,20 @@ def test_iteration_len():
     fields = {"eng": eng_field, "fre": fre_field}
     examples = [Example.fromlist(example, fields) for example in data]
     ds = Dataset(examples, fields, sort_key=lambda x: len(x.eng))
-    eng_encoder = TextEncoder(
+    eng_encoder = eng_field.build_vocab(
+        ds,
         sos_token="<sos>",
         eos_token="<eos>",
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    fre_encoder = TextEncoder(
+    fre_encoder = fre_field.build_vocab(
+        ds,
         sos_token="<sos>",
         eos_token="<eos>",
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    eng_field.build_vocab(eng_encoder, ds)
-    fre_field.build_vocab(fre_encoder, ds)
 
     iterator = Iterator(
         dataset=ds,

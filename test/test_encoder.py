@@ -1,5 +1,5 @@
 from ..utils.encoder import LabelEncoder, TextEncoder
-from .mock_handler import MockLoggingHandler
+from .utils.stub.mock_handler import MockLoggingHandler
 from ..utils.logger import getlogger
 from ..exceptions.NotFittedError import NotFittedError
 import pytest
@@ -235,3 +235,72 @@ def test_text_encoder_pickle():
     assert new_encoder.pad_token == "<pad>"
     assert new_encoder.unk_token == "<unk>"
     os.remove("test_encoder.pickle")
+
+
+def test_text_encoder_max_size():
+    encoder = TextEncoder(
+        sos_token=None,
+        eos_token=None,
+        pad_token=None,
+        unk_token=None,
+        max_size=3,
+    )
+    y = [
+        [
+            "apple",
+            "orange",
+            "pears",
+            "apple",
+            "watermellon",
+            "orange",
+            "apple",
+        ],
+        [
+            "apple",
+            "orange",
+            "pears",
+            "apple",
+            "watermellon",
+            "orange",
+            "apple",
+        ],
+    ]
+    encoder.fit(y)
+    assert len(encoder.stoi) == 3
+    encoder = TextEncoder(
+        sos_token=None, eos_token=None, pad_token=None, unk_token=None
+    )
+    encoder.fit(y)
+    assert len(encoder.stoi) == 4
+
+
+def test_text_encoder_min_freq():
+    encoder = TextEncoder(
+        sos_token=None,
+        eos_token=None,
+        pad_token=None,
+        unk_token=None,
+        min_freq=4,
+    )
+    y = [
+        [
+            "apple",
+            "orange",
+            "pears",
+            "apple",
+            "watermellon",
+            "orange",
+            "apple",
+        ],
+        [
+            "apple",
+            "orange",
+            "pears",
+            "apple",
+            "watermellon",
+            "orange",
+            "apple",
+        ],
+    ]
+    encoder.fit(y)
+    assert len(encoder.stoi) == 2

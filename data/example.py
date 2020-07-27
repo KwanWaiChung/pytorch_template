@@ -1,5 +1,4 @@
 from typing import List, Tuple, Dict, Any
-from ..data.field import Field
 
 
 class Example:
@@ -10,7 +9,9 @@ class Example:
     """
 
     @classmethod
-    def fromlist(cls, data: List[str], fields: Dict[str, Field]) -> "Example":
+    def fromlist(
+        cls, data: List[str], fields: Dict[str, "Field"]
+    ) -> "Example":
         """Create an example from a list of attrbutes.
 
         Args:
@@ -37,7 +38,7 @@ class Example:
 
     @classmethod
     def fromdict(
-        cls, data: Dict[str, Any], fields: Dict[str, Field]
+        cls, data: Dict[str, Any], fields: Dict[str, "Field"]
     ) -> "Example":
         """Create an example from a dict of attributes.
 
@@ -61,7 +62,7 @@ class Example:
             setattr(ex, name, data[name])
         return ex
 
-    def preprocess(self, fields: Dict[str, Field]):
+    def preprocess(self, fields: Dict[str, "Field"]):
         """Preprocess the attributes in this example. This will be
             ran by the constructor of a `Dataset` object. Refer to the
             `preprocess` method of `Field` for more details on what it does to

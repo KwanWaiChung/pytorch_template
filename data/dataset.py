@@ -6,9 +6,8 @@ import pickle
 from multiprocessing.pool import Pool
 from time import time
 from typing import Union, List, Callable, Dict, Any, Tuple
-from ..utils.misc import get_split_ratio
 from .example import Example
-from ..utils.logger import getlogger
+from ..utils import get_split_ratio, getlogger
 from functools import partial
 from sklearn.model_selection import train_test_split
 
@@ -71,25 +70,28 @@ class Dataset(torch.utils.data.Dataset):
                 -1 means using all processors. Default: -1.
 
         """
+        self.logger = getlogger(__name__)
         if n_jobs == -1:
             p = Pool()
         else:
             p = Pool(n_jobs)
 
-        self.logger = getlogger(__name__)
-
-        self.logger.info(
-            "Starting to preprocess the %d examples", len(examples)
-        )
-
-        current_time = time()
-        self.examples = p.map(partial(_preprocess, fields=fields), examples)
         self.fields = fields
         self.sort_key = sort_key
-        self.logger.info(
-            "Finished preprocessing the examples. Total time: %f",
-            time() - current_time,
-        )
+        self.examples = []
+        if examples:
+            self.logger.info(
+                "Starting to preprocess the %d examples", len(examples)
+            )
+
+            current_time = time()
+            self.examples = p.map(
+                partial(_preprocess, fields=fields), examples
+            )
+            self.logger.info(
+                "Finished preprocessing the examples. Total time: %f",
+                time() - current_time,
+            )
 
         if filter_pred:
             self.examples = [
@@ -136,7 +138,7 @@ class Dataset(torch.utils.data.Dataset):
                 If List[float], should be of length of 2 or 3 indicating the
                 portion for train, test and (val).
                 If int, represents the absolute number of train samples.
-            stratify_field (bool): The name of the examples `Field` to
+            stratify_field (bool): The `Field` name of the examples to
                 stratify.
             seed (int): The seed for splitting.
 
@@ -170,16 +172,29 @@ class Dataset(torch.utils.data.Dataset):
             else None,
             random_state=seed,
         )
-        train_examples, val_examples = train_test_split(
-            train_examples,
-            test_size=n_val,
-            stratify=[
-                getattr(example, stratify_field) for example in train_examples
-            ]
-            if stratify_field
-            else None,
-            random_state=seed,
-        )
+
+        if n_val > 0:
+            train_examples, val_examples = train_test_split(
+                train_examples,
+                test_size=n_val,
+                stratify=[
+                    getattr(example, stratify_field)
+                    for example in train_examples
+                ]
+                if stratify_field
+                else None,
+                random_state=seed,
+            )
+            val_dataset = Dataset.fromProcessedExamples(
+                val_examples, self.fields, self.sort_key
+            )
+            train_dataset = Dataset.fromProcessedExamples(
+                train_examples, self.fields, self.sort_key
+            )
+            test_dataset = Dataset.fromProcessedExamples(
+                test_examples, self.fields, self.sort_key
+            )
+            return train_dataset, test_dataset, val_dataset
 
         train_dataset = Dataset.fromProcessedExamples(
             train_examples, self.fields, self.sort_key
@@ -187,10 +202,7 @@ class Dataset(torch.utils.data.Dataset):
         test_dataset = Dataset.fromProcessedExamples(
             test_examples, self.fields, self.sort_key
         )
-        val_dataset = Dataset.fromProcessedExamples(
-            val_examples, self.fields, self.sort_key
-        )
-        return train_dataset, test_dataset, val_dataset
+        return train_dataset, test_dataset
 
     def dump(self, filename: str):
         """
@@ -250,7 +262,7 @@ class TabularDataset(Dataset):
         format: str,
         fields: Dict[str, "Field"],
         reader_params: Dict[str, Any],
-        postprocessor: Callable[[Any], List[Dict]] = None,
+        postprocessor: Callable[[List["Example"]], List["Example"]] = None,
         filter_pred: Callable[[Example], bool] = None,
         sort_key: Callable[["Example"], int] = None,
         n_jobs: int = -1,
@@ -266,12 +278,12 @@ class TabularDataset(Dataset):
                 subset of the json keys or csv columns.
             reader_params (Dict[str, Any]): The extra parameters that got
                 passed to pandas.read_csv() if csv or open() if json
-            postprocessor (Callable): Apply to convert the format to List
-                of Dict after reading the file from pandas.read_csv() or
+            postprocessor (Callable): Apply to the list of Example obtained
+                after reading the file from pandas.read_csv() or
                 json.load().
             filter_pred (Callable[[Example], bool]): A predicate function
                 that filters out the examples. Only the examples of which
-                the predicate evalutes to `True`will be used. Default is None.
+                the predicate evalutes to `True` will be used. Default is None.
             sort_key (Callable[[Example]]): A key to use for sorting examples.
                 Usually its the length of some attributes.
             n_jobs (int): The number of jobs to use for the preprocessing.
@@ -320,14 +332,15 @@ class TabularDataset(Dataset):
 
         Args:
             path (str): Path of the csv file.
-            params (Dict[str, Any]): Parameters for pd.read_csv method
-            postprocessor (Callable): postprocess the list of dicts
+            params (Dict[str, Any]): Parameters for pd.read_csv method.
+            postprocessor (Callable): postprocess the list of examples.
+
         """
         df = pd.read_csv(path, **params)
         df = df.to_dict("records")
-        if postprocessor:
-            df = postprocessor(df)
         df = [Example.fromdict(d, fields) for d in df]
+        if postprocessor:
+            df = [postprocessor(example) for example in df]
         return df
 
     @staticmethod
@@ -342,11 +355,12 @@ class TabularDataset(Dataset):
         Args:
             path (str): Path of the json file.
             params (Dict[str, Any]): Parms for the open() function.
-            postprocessor (Callable): postprocess the list of dicts
+            postprocessor (Callable): postprocess the list of examples.
+
         """
         with open(path, "r", **params) as f:
             j = json.load(f)
-        if postprocessor:
-            j = postprocessor(j)
         j = [Example.fromdict(d, fields) for d in j]
+        if postprocessor:
+            j = [postprocessor(example) for example in j]
         return j

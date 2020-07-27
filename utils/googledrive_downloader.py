@@ -3,7 +3,6 @@ from tqdm import tqdm
 import zipfile
 import requests
 import os
-import math
 
 CHUNK_SIZE = 32768
 DOWNLOAD_URL = "https://drive.google.com/uc?export=download"

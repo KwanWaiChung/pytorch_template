@@ -1,5 +1,4 @@
-from ..data.batcher import Batcher
-from multiprocessing.pool import Pool
+from ..data import Batcher
 import math
 
 

@@ -1,24 +1,14 @@
-from time import sleep
-from random import random
-from ..data.field import Field
-from ..data.dataset import Dataset, TabularDataset
-from ..data.example import Example
+from ..data import Dataset, TabularDataset, Example, Field
+from ..utils import spacy_tokenize
+from .utils.dataset import getTextData, getCsvFilename, getJsonFilename
 import os
-import spacy
-
-spacy = spacy.load("en_core_web_sm")
-
-
-def spacy_tokenize(x):
-    return [
-        tok.text
-        for tok in spacy.tokenizer(x)
-        if not tok.is_punct | tok.is_space
-    ]
 
 
 def filter_long(s):
     return len(s.text) < 100
+
+
+DATA = getTextData()
 
 
 def test_dataset_preprocess():
@@ -30,15 +20,9 @@ def test_dataset_preprocess():
         sos_token="<sos>",
     )
     fields = {"text": field}
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        data = [l.strip() for l in f][:50]
-    examples = [Example.fromlist([example], fields) for example in data]
+    examples = [Example.fromlist([example], fields) for example in DATA]
     ds = Dataset(examples, fields)
-    assert len(ds) == len(data)
+    assert len(ds) == len(DATA)
     assert isinstance(ds[0], Example)
     assert isinstance(ds[0].text, list)
     # test iteration
@@ -60,22 +44,16 @@ def test_filter_pred():
         sos_token="<sos>",
     )
     fields = {"text": field}
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        data = [l.strip() for l in f]
-    examples = [Example.fromlist([example], fields) for example in data]
+    examples = [Example.fromlist([example], fields) for example in DATA]
     ds = Dataset(examples, fields, filter_pred=filter_long)
     for ex in ds.text:
         assert len(ex) < 100
 
 
-def test_split():
+def test_split_with_list_of_ratios():
     text = Field(
         tokenizer=spacy_tokenize,
-        is_sequential=True,
+        is_sequential=False,
         to_lower=False,
         eos_token="<eos>",
         sos_token="<sos>",
@@ -104,6 +82,35 @@ def test_split():
     assert len(val_ds.examples) == len(data) * 0.1
 
 
+def test_split_with_train_ratio():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=False,
+        eos_token="<eos>",
+        sos_token="<sos>",
+    )
+    label = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=False,
+        is_target=True,
+        to_lower=False,
+    )
+    fields = {"text": text, "label": label}
+
+    data = [["a happy comment", "positive"]] * 100 + [
+        ["sad comment", "negative"]
+    ] * 10
+
+    examples = [Example.fromlist(example, fields) for example in data]
+    ds = Dataset(examples, fields)
+    train_ds, test_ds = ds.split(0.8, stratify_field="label")
+
+    # check portion
+    assert len(train_ds.examples) == len(data) * 0.8
+    assert len(test_ds.examples) == len(data) * 0.2
+
+
 def test_read_csv():
     text = Field(
         tokenizer=spacy_tokenize,
@@ -119,7 +126,7 @@ def test_read_csv():
         to_lower=False,
     )
     examples = TabularDataset.read_csv(
-        path=f"{os.path.dirname(os.path.realpath(__file__))}/train.csv",
+        path=getCsvFilename(),
         fields={"comment_text": text, "toxic": label, "severe_toxic": label},
         params={"encoding": "utf-8"},
     )
@@ -143,7 +150,7 @@ def test_read_json():
         to_lower=False,
     )
     examples = TabularDataset.read_json(
-        path=f"{os.path.dirname(os.path.realpath(__file__))}/reviews.json",
+        path=getJsonFilename(),
         fields={"text": text, "stars": label},
         params={"encoding": "utf-8"},
     )
@@ -161,7 +168,7 @@ def test_tabular_dataset_with_csv():
     )
     label = Field(is_sequential=False, is_target=True, to_lower=False)
     ds = TabularDataset(
-        path=f"{os.path.dirname(os.path.realpath(__file__))}/train.csv",
+        path=getCsvFilename(),
         format="csv",
         fields={"comment_text": text, "toxic": label, "severe_toxic": label},
         reader_params={"encoding": "utf-8"},
@@ -182,7 +189,7 @@ def test_tabular_dataset_with_json():
     )
     label = Field(is_sequential=False, is_target=True, to_lower=False)
     ds = TabularDataset(
-        path=f"{os.path.dirname(os.path.realpath(__file__))}/reviews.json",
+        path=getJsonFilename(),
         format="json",
         fields={"text": text, "stars": label},
         reader_params={"encoding": "utf-8"},
@@ -190,6 +197,52 @@ def test_tabular_dataset_with_json():
     for example in ds:
         assert type(example.text) == list
         assert type(example.stars) == int
+
+
+def test_tabular_dataset_with_json_filter_pred():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=True,
+        fix_length=150,
+        batch_first=True,
+    )
+    label = Field(is_sequential=False, is_target=True, to_lower=False)
+    ds = TabularDataset(
+        path=getJsonFilename(),
+        format="json",
+        fields={"text": text, "stars": label},
+        reader_params={"encoding": "utf-8"},
+        filter_pred=lambda x: x.stars == 1 or x.stars == 5,
+    )
+    for example in ds:
+        assert example.stars == 1 or example.stars == 5
+
+
+def test_tabular_dataset_with_json_postprocessor():
+    text = Field(
+        tokenizer=spacy_tokenize,
+        is_sequential=True,
+        to_lower=True,
+        fix_length=150,
+        batch_first=True,
+    )
+    label = Field(is_sequential=False, is_target=True, to_lower=False)
+
+    def postprocessor(example):
+        example.stars = 1 if example.stars > 3 else 0
+        return example
+
+    ds = TabularDataset(
+        path=getJsonFilename(),
+        format="json",
+        fields={"text": text, "stars": label},
+        reader_params={"encoding": "utf-8"},
+        postprocessor=postprocessor,
+    )
+
+    for example in ds:
+        assert example.stars == 0 or example.stars == 1
 
 
 def sort_key(example):
@@ -206,7 +259,7 @@ def test_pickle():
     )
     label = Field(is_sequential=False, is_target=True, to_lower=False)
     ds = TabularDataset(
-        path=f"{os.path.dirname(os.path.realpath(__file__))}/train.csv",
+        path=getCsvFilename(),
         format="csv",
         fields={"comment_text": text, "toxic": label, "severe_toxic": label},
         reader_params={"encoding": "utf-8"},

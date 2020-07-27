@@ -1,6 +1,5 @@
 from .logger import getlogger
 from typing import Union, List
-import numpy as np
 
 logger = getlogger()
 
@@ -12,7 +11,7 @@ def get_split_ratio(split_ratio: Union[List[float], float]):
         assert (
             0.0 < split_ratio < 1.0
         ), f"Split ratio f{split_ratio} is not between 0 and 1"
-        test_ratio = 1.0 - split_ratio
+        test_ratio = round(1.0 - split_ratio, 10)
         return split_ratio, test_ratio, valid_ratio
     elif isinstance(split_ratio, list):
         length = len(split_ratio)
@@ -65,18 +64,9 @@ def flatten_2d(y):
     Returns:
         y (list): The flattened 1d list.
     """
-    warned = False
     res = []
     for ele in y:
         if isinstance(ele, list):
-            if not warned:
-                logger.info(
-                    "A column-vector y was passed when a 1d array was"
-                    " expected. Please change the shape of y to "
-                    "(n_samples, ), for example using ravel()."
-                    " The column-vector is converted to a 1d array"
-                )
-                warned = True
             for _ele in ele:
                 if isinstance(_ele, list):
                     raise ValueError("Input is not 2d or 1d list")

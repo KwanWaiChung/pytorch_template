@@ -2,8 +2,7 @@ from collections import Counter
 from typing import List, Dict
 from .misc import flatten_2d
 from .logger import getlogger
-from ..exceptions.NotFittedError import NotFittedError
-import numpy as np
+from ..exceptions import NotFittedError
 import pickle
 
 
@@ -107,6 +106,9 @@ class LabelEncoder:
         self.itos = d["itos"]
         self.stoi = {word: idx for idx, word in enumerate(self.itos)}
 
+    def __len__(self):
+        return len(self.itos)
+
 
 class TextEncoder(LabelEncoder):
     def __init__(
@@ -115,11 +117,26 @@ class TextEncoder(LabelEncoder):
         unk_token="<unk>",
         sos_token=None,
         eos_token=None,
+        max_size=float("inf"),
+        min_freq=1,
     ):
+        """Handles the mapping of word to index
+
+        Args:
+            pad_token: The token used for padding.
+            unk_token: The token used for out of vocabulary words.
+            sos_token: The token used for specifying the start of a sentence.
+            eos_token: The toekn used for specifying the end of a sentence.
+            max_size: The maximum size of the vocabulary.
+            min_freq: The minimum frequency needed to incldue a token.
+
+        """
         self.pad_token = pad_token
         self.unk_token = unk_token
         self.sos_token = sos_token
         self.eos_token = eos_token
+        self.max_size = max_size
+        self.min_freq = min_freq
 
         itos = []
         if unk_token:
@@ -136,16 +153,34 @@ class TextEncoder(LabelEncoder):
             itos.append(eos_token)
         super().__init__(itos=itos)
 
-    def fit(self, y):
-        super().fit(
-            y,
-            special_tokens=[
-                self.unk_token,
-                self.pad_token,
-                self.sos_token,
-                self.eos_token,
-            ],
-        )
+    def fit(
+        self, y: List[str], special_tokens: List[str] = []
+    ) -> "LabelEncoder":
+        """Build the word indexes according to corpus. If it was fitted
+            before, then it will do nothing.
+
+        Args:
+            y (List[str]): The list of label.
+            special_tokens(List[str]): The list of labels that will be
+                excluded when encoding.
+        """
+        if self.fitted:
+            self.logger.debug("The encoder has already been fitted")
+            return self
+
+        c = Counter(flatten_2d(y))
+        self.stof.update(c)
+        for i, (word, freq) in enumerate(c.items()):
+            if i >= self.max_size:
+                break
+            if word not in special_tokens and freq >= self.min_freq:
+                self.itos.append(word)
+
+        for idx, word in enumerate(self.itos):
+            self.stoi[word] = idx
+        self.logger.debug("The word indexes has been built")
+        self.fitted = True
+        return self
 
     def __getstate__(self):
         d = super().__getstate__()

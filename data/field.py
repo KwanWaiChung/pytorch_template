@@ -1,10 +1,6 @@
 from typing import Callable, List, Union, Tuple
 from .pipeline import Pipeline
-from ..utils.misc import pad as _pad
-from ..utils.encoder import LabelEncoder, TextEncoder
-
-#  from ..data.dataset import Dataset
-from multiprocessing.pool import Pool
+from ..utils import LabelEncoder, TextEncoder, pad as _pad
 import torch
 
 
@@ -88,6 +84,7 @@ class Field:
         self.eos_token = eos_token
         self.pad_first = pad_first
         self.truncate_first = truncate_first
+        self.encoder = None
 
     def preprocess(self, s: Union[str, List[str]]) -> Union[str, List[str]]:
         """Preprocess a single example using this field, tokenizing if needed.
@@ -241,11 +238,7 @@ class Field:
             return batch, lengths
         return batch
 
-    def build_vocab(
-        self,
-        encoder: Union[LabelEncoder, TextEncoder],
-        *datasets: List["Dataset"],
-    ):
+    def build_vocab(self, *datasets: List["Dataset"], **kwargs):
         """Build the word to index table.
 
         Args:
@@ -258,14 +251,20 @@ class Field:
                 object will be changed in place after fitting.
 
         """
-        self.encoder = encoder
+        if self.encoder is not None:
+            self.logger.debug("The field has already been fitted.")
+            return self.encoder
+        self.encoder = (
+            LabelEncoder(**kwargs) if self.is_target else TextEncoder(**kwargs)
+        )
+
         examples = []
         for dataset in datasets:
             for name, field in dataset.fields.items():
                 if field == self:
                     examples += list(getattr(dataset, name))
-        encoder.fit(examples)
-        return encoder
+        self.encoder.fit(examples)
+        return self.encoder
 
     def __eq__(self, obj):
         #  return self.__dict__ == obj.__dict__

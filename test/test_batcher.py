@@ -2,22 +2,18 @@ from ..data.example import Example
 from ..data.field import Field
 from ..data.dataset import Dataset
 from ..data.batcher import Batcher, BucketBatcher
+from .utils.dataset import getTextData
 import numpy as np
 import os
 import random
 
-random.seed(0)
+SEED = 170
 
 FIELD = Field(
     is_sequential=True, to_lower=True, eos_token="<eos>", sos_token="<sos>"
 )
 FIELDS = {"text": FIELD}
-with open(
-    f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-    "r",
-    encoding="utf-8",
-) as f:
-    DATA = [l.strip() for l in f][:50]
+DATA = getTextData()
 EXAMPLES = [Example.fromlist([example], FIELDS) for example in DATA]
 DS = Dataset(EXAMPLES, FIELDS, sort_key=lambda x: len(x.text))
 
@@ -46,9 +42,10 @@ def test_iteration_with_no_shuffle_and_no_sort():
 
 def test_iteration_with_shuffle_and_no_sort():
     batcher = Batcher(
-        DS, batch_size=4, seed=0, sort_within_batch=False, to_shuffle=True
+        DS, batch_size=4, seed=SEED, sort_within_batch=False, to_shuffle=True
     )
 
+    random.seed(SEED)
     examples = random.sample(DS.examples, len(DS.examples))
 
     is_sorted = True
@@ -62,10 +59,10 @@ def test_iteration_with_shuffle_and_no_sort():
 
 def test_iteration_with_shuffle_and_sort():
     batcher = Batcher(
-        DS, batch_size=4, seed=0, sort_within_batch=True, to_shuffle=True
+        DS, batch_size=4, seed=SEED, sort_within_batch=True, to_shuffle=True
     )
 
-    random.seed(0)
+    random.seed(SEED)
     examples = random.sample(DS.examples, len(DS.examples))
     for i, minibatch in enumerate(batcher):
         length = len(minibatch[0].text)

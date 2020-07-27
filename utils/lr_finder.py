@@ -1,10 +1,9 @@
-import copy
-import os
 import torch
+import os
+import copy
+import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 from torch.optim.lr_scheduler import _LRScheduler
-from typing import Union
 from .logger import getlogger
 
 
@@ -21,11 +20,6 @@ class LRFinder(object):
         optimizer (torch.optim.Optimizer): Wrapped optimizer where the defined
             learning is assumed to be the lower boundary of the range test.
         criterion (torch.nn.Module): Wrapped loss function.
-        device (str or torch.device, optional): A string ("cpu" or "cuda") with
-            an optional ordinal for the device type (e.g. "cuda:X",
-            where is the ordinal). Alternatively, can be an object
-            representing the device on which the computation will take place.
-            Default: None, uses the same device as `model`.
         memory_cache (bool, optional): If this flag is set to True,
             `state_dict` of model and optimizer will be cached in memory.
             Otherwise, they will be saved to files under the `cache_dir`.
@@ -44,48 +38,35 @@ class LRFinder(object):
     fastai/lr_find: https://github.com/fastai/fastai
     """
 
-    def __init__(
-        self,
-        model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        criterion: torch.nn.Module,
-        device: Union[str, torch.device] = None,
-        memory_cache: bool = True,
-        cache_dir: str = None,
-    ):
+    def __init__(self, trainer: "Trainer"):
         self.logger = getlogger(__name__)
-        self.model = model
-        self.optimizer = optimizer
-        self.criterion = criterion
+        self.trainer = trainer
         self.history = {"lr": [], "loss": []}
         self.best_loss = None
-        self.memory_cache = memory_cache
-        self.cache_dir = cache_dir
         self.use_val = False
 
         # Save the original state of the model and optimizer so they
         # can be restored if needed
-        self.model_device = next(self.model.parameters()).device
-        self.state_cacher = StateCacher(memory_cache, cache_dir=cache_dir)
-        self.state_cacher.store("model", self.model.state_dict())
-        self.state_cacher.store("optimizer", self.optimizer.state_dict())
+        self.memory = {
+            "model": copy.deepcopy(self.trainer.model.state_dict()),
+            "optimizer": copy.deepcopy(self.trainer.optimizer.state_dict()),
+        }
 
-        # If device is None, use the same as the model
-        if device:
-            self.device = device
-        else:
-            self.device = self.model_device
-
-    def reset(self):
+    def _reset(self):
         """Restores the model and optimizer to their initial states."""
-        self.model.load_state_dict(self.state_cacher.retrieve("model"))
-        self.optimizer.load_state_dict(self.state_cacher.retrieve("optimizer"))
-        self.model.to(self.model_device)
+        self.trainer.model.load_state_dict(self.memory["model"])
+        self.trainer.optimizer.load_state_dict(self.memory["optimizer"])
 
-    def __call__(
+    def _forever_dataloader(self, dl):
+        while True:
+            for X, y in dl:
+                yield X, y
+
+    def fit(
         self,
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader = None,
+        train_dl: "Iterator",
+        val_dl: "Iterator" = None,
+        str_lr=1e-7,
         end_lr=10,
         num_iter=100,
         step_mode="exp",
@@ -94,7 +75,7 @@ class LRFinder(object):
     ):
         """Performs the learning rate range test.
 
-        Arguments:
+        Args:
             train_loader (torch.utils.data.DataLoader):
                 The training set data laoder.
             val_loader (torch.utils.data.DataLoader, optional):
@@ -116,118 +97,111 @@ class LRFinder(object):
             diverge_th (int, optional): The test is stopped when the loss
                 surpasses the threshold(diverge_th * best_loss). Default: 5.
         """
-        if val_loader is not None:
+        self._set_learning_rate(str_lr)
+        if val_dl is not None:
             self.use_val = True
         # Reset test results
         self.history = {"lr": [], "loss": []}
-        self.best_loss = None
-
-        # Move the model to the proper device
-        self.model.to(self.device)
+        best_loss = float("inf")
 
         # Initialize the proper learning rate policy
         if step_mode.lower() == "exp":
-            lr_schedule = ExponentialLR(self.optimizer, end_lr, num_iter)
+            lr_schedule = ExponentialLR(
+                self.trainer.optimizer, end_lr, num_iter
+            )
         elif step_mode.lower() == "linear":
-            lr_schedule = LinearLR(self.optimizer, end_lr, num_iter)
+            lr_schedule = LinearLR(self.trainer.optimizer, end_lr, num_iter)
         else:
             raise ValueError(
                 "expected one of (exp, linear), got {}".format(step_mode)
             )
 
-        if smooth_f < 0 or smooth_f >= 1:
+        if smooth_f < 0 or smooth_f > 1:
             raise ValueError("smooth_f is outside the range [0, 1]")
 
-        # Create an iterator to get data batch by batch
-        iterator = iter(train_loader)
-        self.logger.info("Starting LRFinder")
-        for iteration in tqdm(range(num_iter)):
-            # Get a new set of inputs and labels
-            try:
-                inputs, labels = next(iterator)
-            except StopIteration:
-                iterator = iter(train_loader)
-                inputs, labels = next(iterator)
+        for i, (train_X, train_y) in enumerate(
+            self._forever_dataloader(train_dl)
+        ):
+            if i == num_iter:
+                break
 
-            # Train on batch and retrieve loss
-            self.logger.debug("Start training at iteration %d", iteration + 1)
-            loss = self._train_batch(inputs, labels)
-            self.logger.debug(
-                "Finished training at iteration %d", iteration + 1
-            )
-            if val_loader:
-                self.logger.debug(
-                    "Start validating at iteration %d", iteration + 1
-                )
-                loss = self._validate(val_loader)
-                self.logger.debug(
-                    "Finished validating at iteration %d", iteration + 1
-                )
+            self.history["lr"].append(lr_schedule.get_last_lr()[0])
+            loss = self._train_batch(train_X, train_y)
 
-            # Update the learning rate
+            if val_dl is not None:
+                loss = self._validate(val_dl)
             lr_schedule.step()
-            self.history["lr"].append(lr_schedule.get_lr()[0])
-
-            # Track the best loss and smooth it if smooth_f is specified
-            if iteration == 0:
-                self.best_loss = loss
+            if i == 0:
+                best_loss = loss
             else:
                 if smooth_f > 0:
                     loss = (
                         smooth_f * loss
                         + (1 - smooth_f) * self.history["loss"][-1]
                     )
-                if loss < self.best_loss:
-                    self.best_loss = loss
+                if loss < best_loss:
+                    best_loss = loss
 
-            # Check if the loss has diverged; if it has, stop the test
             self.history["loss"].append(loss)
-            if loss > diverge_th * self.best_loss:
+            if loss > diverge_th * best_loss:
                 self.logger.info("Stopping early, the loss has diverged")
                 break
 
+        self._reset()
         self.logger.info(
-            "Learning rate search finished. "
-            "See the graph with {finder_name}.plot()"
+            "Learning rate search has finished. Model and "
+            "optimizer weights has been restored."
         )
 
-    def _train_batch(self, inputs, labels):
+    def _train_batch(self, train_X, train_y):
         # Set model to training mode
-        self.model.train()
+        self.trainer.model.train()
 
         # Move data to the correct device
-        inputs = inputs.to(self.device)
-        labels = labels.to(self.device)
+        train_X = train_X.to(self.trainer.device)
+        train_y = train_y.to(self.trainer.device)
 
         # Forward pass
-        self.optimizer.zero_grad()
-        outputs = self.model(inputs)
-        loss = self.criterion(outputs, labels)
+        self.trainer.optimizer.zero_grad()
+        outputs = self.trainer.model(train_X)
+        loss = self.trainer.criterion(outputs, train_y)
 
         # Backward pass
         loss.backward()
-        self.optimizer.step()
-
+        self.trainer.optimizer.step()
         return loss.item()
 
-    def _validate(self, dataloader):
+    def _validate(self, val_dl):
         # Set model to evaluation mode and disable gradient computation
         running_loss = 0
-        self.model.eval()
+        size = 0
+        self.trainer.model.eval()
         with torch.no_grad():
-            for inputs, labels in dataloader:
+            for val_X, val_y in val_dl:
                 # Move data to the correct device
-                inputs = inputs.to(self.device)
-                labels = labels.to(self.device)
+                val_X = val_X.to(self.trainer.device)
+                val_y = val_y.to(self.trainer.device)
 
                 # Forward pass and loss computation
-                outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
-                running_loss += loss.item() * inputs.size(0)
+                outputs = self.trainer.model(val_X)
+                loss = self.trainer.criterion(outputs, val_y)
+                running_loss += loss.item() * val_X.shape[0]
+                size += val_X.shape[0]
+        return running_loss / size
 
-        return running_loss / len(dataloader.dataset)
+    def _set_learning_rate(self, new_lr):
+        for param_group in self.trainer.optimizer.param_groups:
+            param_group["lr"] = new_lr
 
-    def plot(self, skip_start=0, skip_end=0, log_lr=True):
+    def plot(
+        self,
+        skip_start=0,
+        skip_end=0,
+        log_lr=True,
+        recommend=True,
+        plot=False,
+        output_path=None,
+    ):
         """Plots the learning rate range test.
 
         Arguments:
@@ -257,12 +231,37 @@ class LRFinder(object):
             losses = losses[skip_start:-skip_end]
 
         # Plot loss as a function of the learning rate
-        plt.plot(lrs, losses)
+        fig, ax = plt.subplots()
+        ax.plot(lrs, losses)
+        #  plt.plot(lrs, losses)
         if log_lr:
-            plt.xscale("log")
-        plt.xlabel("Learning rate")
-        plt.ylabel("Validation Loss" if self.use_val else "Training Loss")
-        plt.show()
+            #  plt.xscale("log")
+            ax.set_xscale("log")
+        #  plt.xlabel("Learning rate")
+        #  plt.ylabel("Validation Loss" if self.use_val else "Training Loss")
+        ax.set_xlabel("Learning rate")
+        ax.set_ylabel("Validation Loss" if self.use_val else "Training Loss")
+
+        if recommend:
+            min_grad_idx = (np.gradient(np.array(losses))).argmin()
+            ax.scatter(
+                lrs[min_grad_idx],
+                losses[min_grad_idx],
+                s=75,
+                marker="o",
+                color="red",
+                zorder=2,
+                label=f"steepest gradient({lrs[min_grad_idx]:.4f})",
+            )
+            ax.legend()
+        if plot:
+            plt.show()
+        if output_path is not None:
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            plt.savefig(output_path)
+        x = ax.lines[0].get_xdata()
+        y = ax.lines[0].get_ydata()
+        return (x, y), lrs[min_grad_idx] if recommend else (x, y)
 
 
 class LinearLR(_LRScheduler):
@@ -317,57 +316,3 @@ class ExponentialLR(_LRScheduler):
         return [
             base_lr * (self.end_lr / base_lr) ** r for base_lr in self.base_lrs
         ]
-
-
-class StateCacher(object):
-    def __init__(self, in_memory, cache_dir=None):
-        self.in_memory = in_memory
-        self.cache_dir = cache_dir
-
-        if self.cache_dir is None:
-            import tempfile
-
-            self.cache_dir = tempfile.gettempdir()
-        else:
-            if not os.path.isdir(self.cache_dir):
-                raise ValueError("Given `cache_dir` is not a valid directory.")
-
-        self.cached = {}
-
-    def store(self, key, state_dict):
-        if self.in_memory:
-            self.cached.update({key: copy.deepcopy(state_dict)})
-        else:
-            fn = os.path.join(
-                self.cache_dir, "state_{}_{}.pt".format(key, id(self))
-            )
-            self.cached.update({key: fn})
-            torch.save(state_dict, fn)
-
-    def retrieve(self, key):
-        if key not in self.cached:
-            raise KeyError("Target {} was not cached.".format(key))
-
-        if self.in_memory:
-            return self.cached.get(key)
-        else:
-            fn = self.cached.get(key)
-            if not os.path.exists(fn):
-                raise RuntimeError(
-                    f"Failed to load state in {fn}. "
-                    "File does not exist anymore."
-                )
-            state_dict = torch.load(
-                fn, map_location=lambda storage, location: storage
-            )
-            return state_dict
-
-    def __del__(self):
-        """Check whether there are unused cached files existing in `cache_dir` before
-        this instance being destroyed."""
-        if self.in_memory:
-            return
-
-        for k in self.cached:
-            if os.path.exists(self.cached[k]):
-                os.remove(self.cached[k])

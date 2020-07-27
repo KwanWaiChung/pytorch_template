@@ -2,7 +2,10 @@ from ..data.example import Example
 from ..data.field import Field
 from ..data.dataset import Dataset
 from ..utils.encoder import TextEncoder, LabelEncoder
-import os
+from .utils.dataset import getTextData
+import re
+
+DATA = getTextData()
 
 
 def func1(s: str) -> str:
@@ -21,8 +24,6 @@ def test_preprocess():
 
 
 def test_cleaning():
-    import re
-
     transform = [("lower", func1), ("trim3", func2)]
 
     def cleaner(s):
@@ -108,15 +109,6 @@ def test_pad_length():
 
 
 def test_build_vocab_with_one_dataset():
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        import random
-
-        data = random.choices([l.strip() for l in f], k=50)
-
     field = Field(
         eos_token="<eos>",
         sos_token="<sos>",
@@ -125,11 +117,10 @@ def test_build_vocab_with_one_dataset():
         include_lengths=True,
     )
 
-    encoder = TextEncoder()
     fields = {"text": field}
-    examples = [Example.fromlist([example], fields) for example in data]
+    examples = [Example.fromlist([example], fields) for example in DATA]
     ds = Dataset(examples, fields)
-    field.build_vocab(encoder, ds)
+    encoder = field.build_vocab(ds)
 
     from collections import Counter
 
@@ -153,14 +144,13 @@ def test_build_vocab_with_two_dataset():
         include_lengths=True,
     )
 
-    encoder = TextEncoder()
     fields = {"text": field}
 
     examples1 = [Example.fromlist([example], fields) for example in data1]
     examples2 = [Example.fromlist([example], fields) for example in data2]
     ds1 = Dataset(examples1, fields)
     ds2 = Dataset(examples2, fields)
-    field.build_vocab(encoder, ds1, ds2)
+    encoder = field.build_vocab(ds1, ds2)
 
     assert encoder.stof == {
         "The": 1,
@@ -182,14 +172,12 @@ def test_numericalize():
     text = Field(is_sequential=True)
     label = Field(is_sequential=False, is_target=True)
 
-    text_encoder = TextEncoder()
-    label_encoder = LabelEncoder()
     fields = {"text": text, "label": label}
     examples = [Example.fromlist(example, fields) for example in data]
 
     ds = Dataset(examples, fields)
-    text.build_vocab(text_encoder, ds)
-    label.build_vocab(label_encoder, ds)
+    text_encoder = text.build_vocab(ds)
+    label_encoder = label.build_vocab(ds)
 
     text_digit = text._numericalize_batch(ds.text)
     # decode return [label]
@@ -203,29 +191,20 @@ def test_numericalize():
 
 
 def test_process():
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        import random
-
-        data = random.choices([l.strip() for l in f], k=50)
-
     field = Field(
         eos_token="<eos>", sos_token="<sos>", fix_length=5, is_sequential=True
     )
 
-    encoder = TextEncoder(
+    fields = {"text": field}
+    examples = [Example.fromlist([example], fields) for example in DATA]
+    ds = Dataset(examples, fields)
+    encoder = field.build_vocab(
+        ds,
         sos_token="<sos>",
         eos_token="<eos>",
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    fields = {"text": field}
-    examples = [Example.fromlist([example], fields) for example in data]
-    ds = Dataset(examples, fields)
-    field.build_vocab(encoder, ds)
 
     batch = field.process(list(ds.text)[:4])
     for i, example in enumerate(batch):
@@ -235,15 +214,6 @@ def test_process():
 
 
 def test_process_with_length():
-    with open(
-        f"{os.path.dirname(os.path.realpath(__file__))}/test_data.txt",
-        "r",
-        encoding="utf-8",
-    ) as f:
-        import random
-
-        data = random.choices([l.strip() for l in f], k=50)
-
     field = Field(
         eos_token="<eos>",
         sos_token="<sos>",
@@ -252,17 +222,17 @@ def test_process_with_length():
         include_lengths=True,
     )
 
-    encoder = TextEncoder(
+    fields = [("text", field)]
+    fields = {"text": field}
+    examples = [Example.fromlist([example], fields) for example in DATA]
+    ds = Dataset(examples, fields)
+    encoder = field.build_vocab(
+        ds,
         sos_token="<sos>",
         eos_token="<eos>",
         pad_token="<pad>",
         unk_token="<unk>",
     )
-    fields = [("text", field)]
-    fields = {"text": field}
-    examples = [Example.fromlist([example], fields) for example in data]
-    ds = Dataset(examples, fields)
-    field.build_vocab(encoder, ds)
 
     batch = field.process(list(ds.text)[:4])
     for i, (example, length) in enumerate(zip(*batch)):

@@ -1,17 +1,14 @@
-from ..callbacks.callbacks import (
-    CallbackHandler,
-    Callback,
-    ProgressBar,
-    History,
-)
+from ..callbacks import CallbackHandler, Callback, ProgressBar, History, Argmax
 from ..utils.logger import getlogger
-from .mock_handler import MockLoggingHandler
+from .utils.stub.mock_handler import MockLoggingHandler
 from collections import namedtuple
 import torch
 
 handler = MockLoggingHandler(level="DEBUG")
 logger = getlogger()
 logger.parent.addHandler(handler)
+# 170 -> 101010, good balance of 1 and 0
+torch.manual_seed(170)
 
 
 class TestingCallback(Callback):
@@ -88,9 +85,13 @@ class TestingCallback(Callback):
 
 class DummyTrainer:
     def __init__(self, callbacks):
-        self.callbacks = CallbackHandler(callbacks, self)
+        self.history = History()
+        self.callbacks = CallbackHandler([self.history] + callbacks, self)
         self.metrics = []
         self.logs = {}
+        self.n_batches = 3
+        self.batch_size = 5
+        self.use_val = True
 
     def fit(self, n_epochs):
         self.logs["n_epochs"] = n_epochs
@@ -104,22 +105,25 @@ class DummyTrainer:
 
     def fit_epoch(self):
         #  self.model.train()
-        self.logs["n_batches"] = 3
+        self.logs["n_batches"] = self.n_batches
         self.callbacks.on_epoch_begin(self.logs)
         for i in range(self.logs["n_batches"]):
             self.logs["last_X"] = torch.randn(2, 2)
-            self.logs["last_y_true"] = torch.randn(1)
+            self.logs["last_y_true"] = torch.randn(2)
             self.logs["batch"] = i
+            self.logs["batch_size"] = self.batch_size
             self.callbacks.on_train_batch_begin(self.logs)
 
             #  output = self.model(self.logs["last_X"])
 
-            self.logs["last_y_pred"] = torch.randn(1)
+            self.logs["last_y_pred"] = torch.randn(2)
             self.callbacks.on_loss_begin(self.logs)
             #  loss = self.criterion()
             self.logs["loss"] = (
-                (self.logs["last_y_pred"] - self.logs["last_y_true"]) ** 2
-            ).item()
+                ((self.logs["last_y_pred"] - self.logs["last_y_true"]) ** 2)
+                .mean()
+                .item()
+            )
             self.callbacks.on_loss_end(self.logs)
 
             #  loss.backward()
@@ -128,11 +132,13 @@ class DummyTrainer:
             self.callbacks.on_train_batch_end(self.logs)
 
         # validation
-        self.logs["n_batches"] = 2
+        self.logs["n_batches"] = self.n_batches
+        self.callbacks.on_val_begin(self.logs)
         for i in range(self.logs["n_batches"]):
             self.logs["last_X"] = torch.randn(2, 2)
             self.logs["last_y_true"] = torch.randn(1)
-            self.logs["batch"] = 2
+            self.logs["batch"] = i
+            self.logs["batch_size"] = self.batch_size
             self.callbacks.on_test_batch_begin(self.logs)
 
             #  output = self.model(self.logs["last_X"])
@@ -151,7 +157,49 @@ class DummyTrainer2:
     metric = namedtuple("Metric", ["name"])
 
     def __init__(self):
-        self.metrics = [self.metric("f1")]
+        self.metrics = []
+        self.use_val = True
+
+
+def test_history():
+    n_epochs = 2
+    n_batches = 3
+    batch_size = 5
+    h = History()
+    h.set_trainer(DummyTrainer2())
+    loss = torch.randn(n_epochs, n_batches)
+    val_loss = torch.randn(n_epochs, n_batches)
+    for e, (l, val_l) in enumerate(zip(loss, val_loss)):
+        h.on_epoch_begin()
+        for b, _l in enumerate(l):
+            h.on_train_batch_end(
+                {
+                    "loss": _l.item(),
+                    "batch": b,
+                    "batch_size": batch_size,
+                    "n_batches": n_batches,
+                    "epoch": e,
+                    "n_epochs": n_epochs,
+                }
+            )
+        h.on_val_begin()
+        for b, _val_l in enumerate(val_l):
+            h.on_test_batch_end(
+                {
+                    "val_loss": _val_l.item(),
+                    "batch": b,
+                    "batch_size": batch_size,
+                    "n_batches": n_batches,
+                    "epoch": e,
+                    "n_epoches": n_epochs,
+                }
+            )
+        h.on_epoch_end({"epoch": e + 1, "n_epochs": n_epochs, "val_loss": 123})
+    assert h.epoch == list(range(1, n_epochs + 1))
+    assert torch.allclose(torch.tensor(h.history["loss"]), loss.mean(dim=1))
+    assert torch.allclose(
+        torch.tensor(h.history["val_loss"]), val_loss.mean(dim=1)
+    )
 
 
 def test_callback_basic():
@@ -164,27 +212,26 @@ def test_progress_bar():
     trainer.fit(2)
 
 
-def test_history():
-    h = History()
-    h.set_trainer(DummyTrainer2())
-    f1s = torch.randn(5)
-    loss = torch.randn(5)
-    val_loss = torch.randn(5)
-    val_f1s = torch.randn(5)
-    for i, (f1, l, val_l, val_f1) in enumerate(
-        zip(f1s, loss, val_loss, val_f1s)
-    ):
-        h.on_epoch_end(
-            {
-                "epoch": i + 1,
-                "loss": l.item(),
-                "val_loss": val_l.item(),
-                "f1": f1.item(),
-                "val_f1": val_f1.item(),
-            }
-        )
-    assert h.epoch == list(range(1, 6))
-    assert h.history["loss"] == loss.tolist()
-    assert h.history["val_loss"] == val_loss.tolist()
-    assert h.history["f1"] == f1s.tolist()
-    assert h.history["val_f1"] == val_f1s.tolist()
+def test_argmax():
+    class ArgmaxTrainer:
+        def __init__(self):
+            self.callbacks = CallbackHandler([Argmax()], self)
+            self.logs = {}
+
+        def fit(self, n_epochs):
+            for i in range(1, n_epochs + 1):
+                self.fit_epoch()
+
+        def fit_epoch(self):
+            # assume one batch only
+            self.logs["last_y_pred"] = torch.tensor(
+                [[1, 2, 3, 4], [1, 2, 4, 3], [1, 4, 2, 3], [4, 1, 2, 3]]
+            )
+            self.callbacks.on_loss_end(self.logs)
+            assert (
+                self.logs["last_y_pred"]
+                == torch.tensor([3, 2, 1, 0], dtype=torch.int64)
+            ).all()
+
+    trainer = ArgmaxTrainer()
+    trainer.fit(1)

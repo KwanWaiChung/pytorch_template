@@ -6,7 +6,7 @@ import os
 s = os.path.join(os.path.dirname(__file__), "..", "log.txt")
 logging.config.fileConfig(
     os.path.join(os.path.abspath(os.path.dirname(__file__)), "logging.conf"),
-    #  disable_existing_loggers=False,
+    disable_existing_loggers=True,
     defaults={
         "logfilename": os.path.join(os.path.dirname(__file__), "..", "log.txt")
     },

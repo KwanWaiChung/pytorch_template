@@ -1,6 +1,4 @@
-from .example import Example
-from typing import Callable, List
-from ..utils.misc import batch
+from ..utils import batch
 import math
 import random
 

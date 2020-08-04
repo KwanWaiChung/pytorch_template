@@ -1,8 +1,27 @@
-from ..callbacks import CallbackHandler, Callback, ProgressBar, History, Argmax
+from ..callbacks import (
+    CallbackHandler,
+    Callback,
+    ProgressBar,
+    History,
+    Argmax,
+    ModelCheckpoint,
+    EarlyStopping,
+    TensorBoard,
+)
+from ..trainer import BaseTrainer
+from ..metrics import Accuracy
 from ..utils.logger import getlogger
 from .utils.stub.mock_handler import MockLoggingHandler
+from .utils.model import LSTM
+from .utils.dataset import getYelpDataloader
 from collections import namedtuple
+import random
+import copy
 import torch
+import torch.nn as nn
+import os
+import shutil
+import pytest
 
 handler = MockLoggingHandler(level="DEBUG")
 logger = getlogger()
@@ -235,3 +254,348 @@ def test_argmax():
 
     trainer = ArgmaxTrainer()
     trainer.fit(1)
+
+
+class TestModelCheckpoint:
+    def setup_method(self, method):
+        torch.manual_seed(170)
+        self.lr = 1e-2
+        self.handler = MockLoggingHandler(level="DEBUG")
+        logger = getlogger()
+        logger.parent.addHandler(self.handler)
+
+        self.train_dl, self.val_dl, vocab_size = getYelpDataloader(full=False)
+        self.model = LSTM(
+            vocab_size=vocab_size,
+            embedding_dim=30,
+            hidden_dim=10,
+            n_layers=1,
+            n_classes=2,
+        )
+
+    def teardown_method(self, method):
+        if os.path.exists("save"):
+            shutil.rmtree("save")
+
+    def get_trainer(self, model_checkpoint):
+        return BaseTrainer(
+            model=self.model,
+            criterion=nn.CrossEntropyLoss(),
+            optimizer=torch.optim.Adam(self.model.parameters(), lr=self.lr),
+            metrics=[Accuracy()],
+            callbacks=[Argmax(), model_checkpoint],
+        )
+
+    def test_model_checkpoint_always_save(self):
+        trainer = self.get_trainer(
+            ModelCheckpoint(save_best_only=False, save_weights_only=True)
+        )
+        trainer.fit(self.train_dl, 2, self.val_dl)
+        assert len(os.listdir("save")) == 2
+        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+        assert "checkpoint_02_0.59.pth" in os.listdir("save")
+
+        state_dict = torch.load(os.path.join("save", "checkpoint_02_0.59.pth"))
+
+        for (k1, v1), (k2, v2) in zip(
+            state_dict["model_state_dict"].items(),
+            trainer.model.state_dict().items(),
+        ):
+            assert k1 == k2
+            assert (v1 == v2).all()
+
+        # state comparision is too recursive to do
+        for (k1, v1), (k2, v2) in zip(
+            state_dict["optimizer_state_dict"]["param_groups"][0].items(),
+            trainer.optimizer.state_dict()["param_groups"][0].items(),
+        ):
+            assert k1 == k2
+            assert v1 == v2
+
+    def test_model_checkpoint_save_best(self):
+        trainer = self.get_trainer(
+            ModelCheckpoint(save_best_only=True, save_weights_only=True)
+        )
+        trainer.fit(self.train_dl, 10, self.val_dl)
+        assert len(os.listdir("save")) == 5
+        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+        assert "checkpoint_02_0.59.pth" in os.listdir("save")
+        assert "checkpoint_05_0.34.pth" in os.listdir("save")
+
+        state_dict = torch.load(os.path.join("save", "checkpoint_05_0.34.pth"))
+        assert "model_state_dict" in state_dict
+        assert "optimizer_state_dict" in state_dict
+
+        # check max epoch == 5
+        assert max([int(s.split("_")[1][1]) for s in os.listdir("save")]) == 5
+
+    def test_model_checkpoint_save_model(self):
+        trainer = self.get_trainer(
+            ModelCheckpoint(save_best_only=False, save_weights_only=False)
+        )
+        trainer.fit(self.train_dl, 1, self.val_dl)
+        assert len(os.listdir("save")) == 1
+        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+
+        state_dict = torch.load(os.path.join("save", "checkpoint_01_0.69.pth"))
+        assert "model" in state_dict
+        assert "model_state_dict" not in state_dict
+        assert "optimizer_state_dict" not in state_dict
+
+        model = state_dict["model"]
+        trainer = self.get_trainer(
+            ModelCheckpoint(save_best_only=False, save_weights_only=False)
+        )
+        trainer.model = model
+        trainer._validate(self.val_dl)
+        assert round(trainer.logs["val_loss"], 2) == 0.69
+
+    def test_model_checkpoint_save_weights(self):
+        model = copy.deepcopy(self.model)
+        trainer = self.get_trainer(
+            ModelCheckpoint(save_best_only=False, save_weights_only=True)
+        )
+        trainer.fit(self.train_dl, 1, self.val_dl)
+        assert len(os.listdir("save")) == 1
+        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+        # check if unequal after trained one epoch
+        for (k1, v1), (k2, v2) in zip(
+            model.state_dict().items(), trainer.model.state_dict().items()
+        ):
+            assert k1 == k2
+            assert (v1 != v2).any()
+
+        # load pickle and check if parameters are the same
+        state_dict = torch.load(os.path.join("save", "checkpoint_01_0.69.pth"))
+        model.load_state_dict(state_dict["model_state_dict"])
+        for (k1, v1), (k2, v2) in zip(
+            model.state_dict().items(), trainer.model.state_dict().items()
+        ):
+            assert k1 == k2
+            assert (v1 == v2).all()
+        trainer = self.get_trainer(
+            ModelCheckpoint(save_best_only=False, save_weights_only=False)
+        )
+        trainer.model = model
+        trainer._validate(self.val_dl)
+        assert round(trainer.logs["val_loss"], 2) == 0.69
+
+    def test_model_checkpoint_filepath(self):
+        trainer = self.get_trainer(
+            ModelCheckpoint(
+                filepath="save/checkpoint_{epoch:02d}_{loss:.3f}_"
+                "{val_loss:.3f}_{val_acc:.3f}.pth",
+                save_best_only=False,
+                save_weights_only=True,
+            )
+        )
+        trainer.fit(self.train_dl, 1, self.val_dl)
+        assert len(os.listdir("save")) == 1
+        assert "checkpoint_01_0.716_0.686_0.000.pth" in os.listdir("save")
+
+    def test_model_checkpoint_with_invalid_filepath(self):
+        filepath = "save/checkpoint_{no:02d}"
+        trainer = self.get_trainer(
+            ModelCheckpoint(
+                filepath=filepath, save_best_only=False, save_weights_only=True
+            )
+        )
+        with pytest.raises(KeyError) as e:
+            trainer.fit(self.train_dl, 1, self.val_dl)
+            assert "Failed to format the filepath: `{}`. "
+            "Reason: `{}` is not provided during training".format(
+                filepath, "no"
+            ) in str(e.value)
+
+    def test_model_checkpoint_restore_training(self):
+        filepath = "save/checkpoint_{epoch:02d}_{val_loss:.2f}.pth"
+        trainer = self.get_trainer(
+            ModelCheckpoint(
+                save_best_only=False,
+                save_weights_only=True,
+                load_weights_on_restart=True,
+                filepath=filepath,
+            )
+        )
+        trainer.fit(self.train_dl, 1, self.val_dl)
+        assert (
+            self.handler.messages["info"][-1]
+            == filepath + " is not found. Start training from scratch."
+        )
+        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+
+        # Resume training
+        trainer.fit(self.train_dl, 2, self.val_dl)
+        assert (
+            self.handler.messages["info"][-1]
+            == "Model weights loaded. Resuming training at 2 epoch"
+        )
+        assert "checkpoint_02_0.59.pth" in os.listdir("save")
+
+    def test_model_checkpoint_restore_training_with_latest_checkpoint(self):
+        filepath = "save/checkpoint_{epoch:02d}_{val_loss:.2f}.pth"
+        trainer = self.get_trainer(
+            ModelCheckpoint(
+                save_best_only=False,
+                save_weights_only=True,
+                load_weights_on_restart=True,
+                filepath=filepath,
+            )
+        )
+        trainer.fit(self.train_dl, 2, self.val_dl)
+
+        # Resume training
+        trainer.fit(self.train_dl, 3, self.val_dl)
+        assert (
+            self.handler.messages["info"][-1]
+            == "Model weights loaded. Resuming training at 3 epoch"
+        )
+        assert "checkpoint_03_0.48.pth" in os.listdir("save")
+
+    def test_model_checkpoint_mode(self):
+        # pretend that higher val_loss means better for testing
+        trainer = self.get_trainer(
+            ModelCheckpoint(
+                save_best_only=True,
+                save_weights_only=True,
+                load_weights_on_restart=False,
+                monitor="val_loss",
+                mode="max",
+            )
+        )
+        trainer.fit(self.train_dl, 7, self.val_dl)
+
+        assert len(os.listdir("save")) == 3
+        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+        assert "checkpoint_06_0.78.pth" in os.listdir("save")
+        assert "checkpoint_07_1.63.pth" in os.listdir("save")
+
+    def test_model_checkpoint_monitor_wrong_metric(self):
+        trainer = self.get_trainer(
+            ModelCheckpoint(
+                save_best_only=False,
+                save_weights_only=True,
+                load_weights_on_restart=False,
+                monitor="non_exist",
+                mode="max",
+            )
+        )
+
+        with pytest.raises(ValueError) as e:
+            trainer.fit(self.train_dl, 1, self.val_dl)
+            assert "Metric non_exist is not provided during training." in str(
+                e.value
+            )
+
+    def test_model_checkpoint_with_additional_save_dict(self):
+        trainer = self.get_trainer(
+            ModelCheckpoint(
+                save_best_only=False,
+                save_weights_only=True,
+                save_dict={"addition": 1},
+            )
+        )
+        trainer.fit(self.train_dl, 1, self.val_dl)
+        state_dict = torch.load(os.path.join("save", "checkpoint_01_0.69.pth"))
+        assert state_dict["addition"] == 1
+
+
+class TestEarlyStopping:
+    def setup_method(self, method):
+        os.makedirs("save", exist_ok=True)
+        torch.manual_seed(170)
+        self.lr = 1e-2
+        self.handler = MockLoggingHandler(level="DEBUG")
+        logger = getlogger()
+        logger.parent.addHandler(self.handler)
+
+        self.train_dl, self.val_dl, vocab_size = getYelpDataloader(full=False)
+        self.model = LSTM(
+            vocab_size=vocab_size,
+            embedding_dim=30,
+            hidden_dim=10,
+            n_layers=1,
+            n_classes=2,
+        )
+
+    def teardown_method(self, method):
+        if os.path.exists("save"):
+            shutil.rmtree("save")
+
+    def get_trainer(self, callbacks):
+        return BaseTrainer(
+            model=self.model,
+            criterion=nn.CrossEntropyLoss(),
+            optimizer=torch.optim.Adam(self.model.parameters(), lr=self.lr),
+            metrics=[Accuracy()],
+            callbacks=[Argmax()] + callbacks,
+        )
+
+    def test_early_stopping_patience(self):
+        trainer = self.get_trainer([EarlyStopping(patience=2)])
+        trainer.fit(self.train_dl, 10, self.val_dl)
+        assert len(trainer.history.history["val_loss"]) == 7
+
+    def test_early_stopping_pickle(self):
+        callback = EarlyStopping(patience=5)
+        callback.on_train_begin({})
+        callback.best_score = 0.5
+        callback.patience = 2
+        torch.save({"c": callback}, "save/save.pth")
+        c = torch.load("save/save.pth")
+        assert c["c"].best_score == 0.5
+        assert c["c"].patience == 2
+
+    def test_early_stopping_model_checkpoint_integration(self):
+        early_stop = EarlyStopping(patience=3)
+        model_checkpoint = ModelCheckpoint(
+            save_best_only=False,
+            save_weights_only=True,
+            save_dict={"early_stopping": early_stop},
+            load_weights_on_restart=True,
+        )
+        trainer = self.get_trainer([early_stop, model_checkpoint])
+        trainer.fit(self.train_dl, 7, self.val_dl)
+
+        # resume training
+        early_stop = EarlyStopping(patience=3)
+        model_checkpoint = ModelCheckpoint(
+            save_best_only=False,
+            save_weights_only=True,
+            save_dict={"early_stopping": early_stop},
+            load_weights_on_restart=True,
+        )
+        trainer = self.get_trainer([early_stop, model_checkpoint])
+        model_checkpoint.on_train_begin({})
+        for value in trainer.callbacks.callbacks:
+            if isinstance(value, EarlyStopping):
+                assert value.wait == 3
+                assert abs(value.best_score - 0.342) < 1e-3
+
+        trainer.fit(self.train_dl, 10, self.val_dl)
+        assert trainer.history.epoch[-1] == 8
+
+
+class TestTensorboard:
+    def teardown_method(self, method):
+        if os.path.exists("logs"):
+            shutil.rmtree("logs")
+
+    def test_tensorboard(self):
+        tensorBoard = TensorBoard("logs")
+        metric = namedtuple("Metric", ["name"])
+        trainer = namedtuple("Trainer", ["use_val", "metrics"])(
+            True, [metric("f1")]
+        )
+        tensorBoard.set_trainer(trainer)
+
+        for i in range(1, 21):
+            tensorBoard.on_epoch_end(
+                {
+                    "loss": random.random(),
+                    "val_loss": random.random(),
+                    "f1": random.random(),
+                    "val_f1": random.random(),
+                    "epoch": i,
+                }
+            )

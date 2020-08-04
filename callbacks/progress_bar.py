@@ -31,7 +31,6 @@ class ProgressBar(Callback):
             metric.name: f"{logs[metric.name]:.4f}"
             for metric in self.trainer.metrics
         }
-        log_data["loss"] = self.trainer.history.history["loss"][-1]
 
         # validation metrics
         if self.trainer.use_val:
@@ -42,10 +41,6 @@ class ProgressBar(Callback):
                     if k.startswith("val_")
                 }
             )
-            if "val_loss" in logs:
-                log_data["val_loss"] = self.trainer.history.history[
-                    "val_loss"
-                ][-1]
 
         self.progbar.set_postfix(log_data)
         self.progbar.update(0)
@@ -58,7 +53,6 @@ class ProgressBar(Callback):
             metric.name: f"{logs[metric.name]:.4f}"
             for metric in self.trainer.metrics
         }
-        log_data["loss"] = self.trainer.history.loss
         self.progbar.set_postfix(log_data)
         self.progbar.update(1)
         return False

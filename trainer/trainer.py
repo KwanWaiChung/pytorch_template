@@ -52,7 +52,7 @@ class BaseTrainer:
             self.use_val = True
         self.logs["n_epochs"] = n_epochs
         self.callbacks.on_train_begin(self.logs)
-        for i in range(1, n_epochs + 1):
+        for i in range(self.logs.get("epoch", 1), n_epochs + 1):
             self.logs["epoch"] = i
             if self.fit_epoch(train_dl, val_dl):
                 break
@@ -133,3 +133,14 @@ class BaseTrainer:
                 self.callbacks.on_loss_end(self.logs)
                 self.logs["val_loss"] = loss.item()
                 self.callbacks.on_test_batch_end(self.logs)
+
+    def _getstate(self):
+        """Get all the related state dicts for saving
+
+        Returns:
+            dict
+        """
+        return {
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+        }

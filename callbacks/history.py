@@ -3,9 +3,11 @@ from collections import defaultdict
 
 
 class History(Callback):
-    """ Records events and metrics.
+    """Records events and metrics.
 
     This callback is automatically applied to every trainer.
+    It will convert the batch loss in `trainer.logs` to average
+    loss across all batches.
 
     Attributes:
         history['loss'] (List): The avg training loss of seen examples.
@@ -28,6 +30,7 @@ class History(Callback):
             logs["loss"] * logs["batch_size"] + self.loss * self.train_samples
         ) / (logs["batch_size"] + self.train_samples)
         self.train_samples += logs["batch_size"]
+        logs["loss"] = self.loss
         return False
 
     def on_val_begin(self, logs=None):
@@ -40,6 +43,7 @@ class History(Callback):
             + self.val_loss * self.val_samples
         ) / (self.val_samples + logs["batch_size"])
         self.val_samples += logs["batch_size"]
+        logs["val_loss"] = self.val_loss
 
     def on_epoch_end(self, logs=None):
         # training metrics

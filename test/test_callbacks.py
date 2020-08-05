@@ -391,7 +391,7 @@ class TestModelCheckpoint:
         )
         trainer.fit(self.train_dl, 1, self.val_dl)
         assert len(os.listdir("save")) == 1
-        assert "checkpoint_01_0.716_0.686_0.000.pth" in os.listdir("save")
+        assert "checkpoint_01_0.716_0.686_0.471.pth" in os.listdir("save")
 
     def test_model_checkpoint_with_invalid_filepath(self):
         filepath = "save/checkpoint_{no:02d}"
@@ -577,10 +577,6 @@ class TestEarlyStopping:
 
 
 class TestTensorboard:
-    def teardown_method(self, method):
-        if os.path.exists("logs"):
-            shutil.rmtree("logs")
-
     def test_tensorboard(self):
         tensorBoard = TensorBoard("logs")
         metric = namedtuple("Metric", ["name"])
@@ -599,3 +595,5 @@ class TestTensorboard:
                     "epoch": i,
                 }
             )
+        if os.path.exists("logs"):
+            shutil.rmtree("logs")

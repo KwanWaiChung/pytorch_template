@@ -1,0 +1,301 @@
+2020-08-05 22:21:43,167 - pytorch_template.data.dataset - INFO - Starting to preprocess the 50 examples
+2020-08-05 22:21:43,175 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.005059
+2020-08-05 22:21:44,044 - pytorch_template.data.dataset - INFO - Starting to preprocess the 100 examples
+2020-08-05 22:21:44,050 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.003856
+2020-08-05 22:21:44,060 - pytorch_template.data.dataset - INFO - Starting to preprocess the 100 examples
+2020-08-05 22:21:44,066 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.004456
+2020-08-05 22:21:44,073 - pytorch_template.utils.logger - INFO - begin training
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - begin epoch
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,074 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,075 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - end epoch
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - begin epoch
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,076 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,077 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - end epoch
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - begin epoch
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,078 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,079 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:21:44,080 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:21:44,080 - pytorch_template.utils.logger - INFO - end epoch
+2020-08-05 22:21:44,080 - pytorch_template.utils.logger - INFO - end training
+2020-08-05 22:21:44,100 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:21:44,216 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.115109
+2020-08-05 22:21:44,268 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:44,401 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:21:44,518 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.115641
+2020-08-05 22:21:44,582 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,170 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:21:45,274 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.102848
+2020-08-05 22:21:45,828 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,830 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,833 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,835 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,836 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,837 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,839 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,839 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,840 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:21:45,859 - pytorch_template.utils.googledrive_downloader - INFO - Downloading /Users/student-t/Desktop/pytorch_template/test/data.zip...
+2020-08-05 22:21:45,863 - pytorch_template.utils.googledrive_downloader - INFO - Downloading /Users/student-t/Desktop/pytorch_template/test/data.zip...
+2020-08-05 22:23:04,384 - pytorch_template.data.dataset - INFO - Starting to preprocess the 50 examples
+2020-08-05 22:23:04,392 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.005410
+2020-08-05 22:23:04,994 - pytorch_template.data.dataset - INFO - Starting to preprocess the 100 examples
+2020-08-05 22:23:04,999 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.002673
+2020-08-05 22:23:05,010 - pytorch_template.data.dataset - INFO - Starting to preprocess the 100 examples
+2020-08-05 22:23:05,015 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.003803
+2020-08-05 22:23:05,022 - pytorch_template.utils.logger - INFO - begin training
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - begin epoch
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,023 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,024 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - end epoch
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - begin epoch
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,025 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,026 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,026 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,026 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,026 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,026 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,026 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,026 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,026 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - end epoch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - begin epoch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,027 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - begin train batch
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - begin loss
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - end loss
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - begin step
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - end train batch
+2020-08-05 22:23:05,028 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,029 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,029 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,029 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,029 - pytorch_template.utils.logger - INFO - begin test batch
+2020-08-05 22:23:05,029 - pytorch_template.utils.logger - INFO - end test batch
+2020-08-05 22:23:05,029 - pytorch_template.utils.logger - INFO - end epoch
+2020-08-05 22:23:05,029 - pytorch_template.utils.logger - INFO - end training
+2020-08-05 22:23:05,047 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:05,148 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.099867
+2020-08-05 22:23:05,197 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:05,326 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:05,432 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.105026
+2020-08-05 22:23:05,499 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:05,975 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:06,080 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.103509
+2020-08-05 22:23:06,154 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:06,270 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:06,375 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.104006
+2020-08-05 22:23:06,459 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:06,559 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:06,676 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.115369
+2020-08-05 22:23:06,773 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:06,875 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:07,016 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.140208
+2020-08-05 22:23:07,116 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:07,218 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:07,328 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.108232
+2020-08-05 22:23:07,450 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:07,463 - pytorch_template.callbacks.model_checkpoint - INFO - save/checkpoint_{epoch:02d}_{val_loss:.2f}.pth is not found. Start training from scratch.
+2020-08-05 22:23:07,534 - pytorch_template.callbacks.model_checkpoint - INFO - Model weights loaded. Resuming training at 2 epoch
+2020-08-05 22:23:07,618 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:07,729 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.108636
+2020-08-05 22:23:07,864 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:07,881 - pytorch_template.callbacks.model_checkpoint - INFO - save/checkpoint_{epoch:02d}_{val_loss:.2f}.pth is not found. Start training from scratch.
+2020-08-05 22:23:07,990 - pytorch_template.callbacks.model_checkpoint - INFO - Model weights loaded. Resuming training at 3 epoch
+2020-08-05 22:23:08,082 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:08,204 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.119793
+2020-08-05 22:23:08,357 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:08,746 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:08,881 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.131751
+2020-08-05 22:23:09,056 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:09,186 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:09,315 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.126605
+2020-08-05 22:23:09,526 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:09,663 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:09,792 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.125530
+2020-08-05 22:23:10,024 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:10,441 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:10,624 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.179883
+2020-08-05 22:23:10,867 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:10,948 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:11,104 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.152275
+2020-08-05 22:23:11,396 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:11,417 - pytorch_template.callbacks.model_checkpoint - INFO - save/checkpoint_{epoch:02d}_{val_loss:.2f}.pth is not found. Start training from scratch.
+2020-08-05 22:23:11,747 - pytorch_template.callbacks.model_checkpoint - DEBUG - Restored EarlyStopping callback
+2020-08-05 22:23:11,747 - pytorch_template.callbacks.model_checkpoint - INFO - Model weights loaded. Resuming training at 8 epoch
+2020-08-05 22:23:11,749 - pytorch_template.callbacks.model_checkpoint - DEBUG - Restored EarlyStopping callback
+2020-08-05 22:23:11,749 - pytorch_template.callbacks.model_checkpoint - INFO - Model weights loaded. Resuming training at 8 epoch
+2020-08-05 22:23:16,420 - pytorch_template.data.dataset - INFO - Starting to preprocess the 50 examples
+2020-08-05 22:23:16,473 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.049014
+2020-08-05 22:23:16,542 - pytorch_template.data.dataset - INFO - Starting to preprocess the 50 examples
+2020-08-05 22:23:16,595 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.049935
+2020-08-05 22:23:16,664 - pytorch_template.data.dataset - INFO - Starting to preprocess the 110 examples
+2020-08-05 22:23:16,684 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.016258
+2020-08-05 22:23:16,983 - pytorch_template.data.dataset - INFO - Starting to preprocess the 110 examples
+2020-08-05 22:23:17,003 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.016729
+2020-08-05 22:23:17,273 - pytorch_template.data.dataset - INFO - Starting to preprocess the 12 examples
+2020-08-05 22:23:17,296 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.020083
+2020-08-05 22:23:17,388 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:17,582 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.190704
+2020-08-05 22:23:17,684 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:17,869 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.182296
+2020-08-05 22:23:17,958 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:18,082 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.120670
+2020-08-05 22:23:18,190 - pytorch_template.data.dataset - INFO - Starting to preprocess the 12 examples
+2020-08-05 22:23:18,218 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.024594
+2020-08-05 22:23:18,227 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,230 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,235 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,237 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,237 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,239 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,240 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,241 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,241 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,243 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,338 - pytorch_template.data.dataset - INFO - Starting to preprocess the 50 examples
+2020-08-05 22:23:18,354 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.011061
+2020-08-05 22:23:18,362 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,471 - pytorch_template.data.dataset - INFO - Starting to preprocess the 2 examples
+2020-08-05 22:23:18,482 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.007117
+2020-08-05 22:23:18,574 - pytorch_template.data.dataset - INFO - Starting to preprocess the 1 examples
+2020-08-05 22:23:18,584 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.005228
+2020-08-05 22:23:18,585 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,696 - pytorch_template.data.dataset - INFO - Starting to preprocess the 2 examples
+2020-08-05 22:23:18,706 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.006708
+2020-08-05 22:23:18,707 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,708 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,818 - pytorch_template.data.dataset - INFO - Starting to preprocess the 50 examples
+2020-08-05 22:23:18,847 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.025667
+2020-08-05 22:23:18,857 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:18,974 - pytorch_template.data.dataset - INFO - Starting to preprocess the 50 examples
+2020-08-05 22:23:18,990 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.011609
+2020-08-05 22:23:18,996 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:19,008 - pytorch_template.utils.googledrive_downloader - INFO - Downloading /Users/student-t/Desktop/pytorch_template/test/data.zip...
+2020-08-05 22:23:25,760 - pytorch_template.utils.googledrive_downloader - INFO - Unzipping /Users/student-t/Desktop/pytorch_template/test/data.zip...
+2020-08-05 22:23:26,825 - pytorch_template.utils.googledrive_downloader - INFO - Finished unzipping.
+2020-08-05 22:23:26,832 - pytorch_template.utils.googledrive_downloader - INFO - Downloading /Users/student-t/Desktop/pytorch_template/test/data.zip...
+2020-08-05 22:23:34,179 - pytorch_template.utils.googledrive_downloader - INFO - Unzipping /Users/student-t/Desktop/pytorch_template/test/data.zip...
+2020-08-05 22:23:40,908 - pytorch_template.utils.googledrive_downloader - INFO - Finished unzipping.
+2020-08-05 22:23:41,042 - pytorch_template.data.dataset - INFO - Starting to preprocess the 10 examples
+2020-08-05 22:23:41,054 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.008676
+2020-08-05 22:23:41,056 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:41,056 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:41,164 - pytorch_template.data.dataset - INFO - Starting to preprocess the 10 examples
+2020-08-05 22:23:41,180 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.010887
+2020-08-05 22:23:41,181 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:41,182 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:41,293 - pytorch_template.data.dataset - INFO - Starting to preprocess the 10 examples
+2020-08-05 22:23:41,305 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.008697
+2020-08-05 22:23:41,307 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:41,308 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:41,447 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:41,616 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.160221
+2020-08-05 22:23:42,107 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:43,244 - pytorch_template.utils.lr_finder - INFO - Stopping early, the loss has diverged
+2020-08-05 22:23:43,245 - pytorch_template.utils.lr_finder - INFO - Learning rate search has finished. Model and optimizer weights has been restored.
+2020-08-05 22:23:45,649 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:45,796 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.142922
+2020-08-05 22:23:46,364 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built
+2020-08-05 22:23:46,784 - pytorch_template.utils.lr_finder - INFO - Stopping early, the loss has diverged
+2020-08-05 22:23:46,786 - pytorch_template.utils.lr_finder - INFO - Learning rate search has finished. Model and optimizer weights has been restored.
+2020-08-05 22:23:48,807 - pytorch_template.data.dataset - INFO - Starting to preprocess the 164 examples
+2020-08-05 22:23:48,945 - pytorch_template.data.dataset - INFO - Finished preprocessing the examples. Total time: 0.133484
+2020-08-05 22:23:49,580 - pytorch_template.utils.encoder - DEBUG - The word indexes has been built

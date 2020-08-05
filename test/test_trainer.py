@@ -37,6 +37,17 @@ def test_trainer_train_regression():
         )
 
 
+#  Yelp metrics for seed 170
+#  acc=0.5000, loss=0.716, val_loss=0.6856, val_acc=0.4706
+#  acc=0.6429, loss=0.638, val_loss=0.5944, val_acc=0.7059
+#  acc=1.0000, loss=0.541, val_loss=0.4788, val_acc=1.0000
+#  acc=1.0000, loss=0.361, val_loss=0.3656, val_acc=1.0000
+#  acc=1.0000, loss=0.154, val_loss=0.3423, val_acc=1.0000
+#  acc=1.0000, loss=0.0504, val_loss=0.7797, val_acc=0.8824
+#  acc=1.0000, loss=0.0188, val_loss=1.6339, val_acc=0.8824
+#  acc=1.0000, loss=0.0091, val_loss=1.3140, val_acc=0.9412
+#  acc=1.0000, loss=0.00539, val_loss=1.5644, val_acc=0.9412
+#  acc=1.0000, loss=0.00364, val_loss=3.3879, val_acc=0.8824
 def test_trainer_train_yelp_classification():
     """Check if trainer converges on text classification.
         Consider it closest to real world task.

@@ -3,22 +3,29 @@ from tqdm import tqdm
 import zipfile
 import requests
 import os
+import re
 
 CHUNK_SIZE = 32768
 DOWNLOAD_URL = "https://drive.google.com/uc?export=download"
 
 
-def download_from_googledrive(file_id: str, dst_path: str, unzip: bool = True):
+def download_from_googledrive(
+    file_id: str, dst_path: str = "", unzip: bool = True
+):
     logger = getlogger(__name__)
-    dst_dir = os.path.dirname(dst_path)
+    session = requests.Session()
+    response = session.get(DOWNLOAD_URL, params={"id": file_id}, stream=True)
+
+    dst_dir, filename = os.path.split(dst_path)
     if dst_dir and not os.path.exists(dst_dir):
         logger.info("Creating directory %s", dst_dir)
         os.makedirs(dst_dir)
+    filename = filename or re.search(
+        r"filename\=\"(.*)\"", response.headers["Content-Disposition"]
+    ).group(1)
+    dst_path = os.path.join(dst_dir, filename)
 
-    logger.info("Downloading %s...", dst_path)
-    session = requests.Session()
-
-    response = session.get(DOWNLOAD_URL, params={"id": file_id}, stream=True)
+    logger.info("Downloading %s...", filename)
 
     # If file size is too big, the page will display a warming
     # The way to crack it is to get the cookie value and
@@ -32,7 +39,7 @@ def download_from_googledrive(file_id: str, dst_path: str, unzip: bool = True):
     _save_response_content(response, dst_path)
 
     if unzip:
-        logger.info(f"Unzipping {dst_path}...")
+        logger.info(f"Unzipping {filename}...")
         with zipfile.ZipFile(dst_path, "r") as z:
             z.extractall(dst_dir)
         # remove the zip too

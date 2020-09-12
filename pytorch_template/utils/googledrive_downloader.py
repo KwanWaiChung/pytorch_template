@@ -11,7 +11,7 @@ DOWNLOAD_URL = "https://drive.google.com/uc?export=download"
 def download_from_googledrive(file_id: str, dst_path: str, unzip: bool = True):
     logger = getlogger(__name__)
     dst_dir = os.path.dirname(dst_path)
-    if not os.path.exists(dst_dir):
+    if dst_dir and not os.path.exists(dst_dir):
         logger.info("Creating directory %s", dst_dir)
         os.makedirs(dst_dir)
 

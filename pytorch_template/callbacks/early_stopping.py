@@ -43,7 +43,7 @@ class EarlyStopping(Callback):
         if (
             (self.best_score - score) > self.min_delta and self.mode == "min"
         ) or (
-            (score > self.best_score) > self.min_delta and self.mode == "max"
+            (score - self.best_score) > self.min_delta and self.mode == "max"
         ):
             self.best_score = score
             self.wait = 0

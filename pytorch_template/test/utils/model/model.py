@@ -1,10 +1,10 @@
 import torch.nn as nn
+from allennlp.modules.token_embedders import Embedding
+from allennlp.modules.text_field_embedders import BasicTextFieldEmbedder
 
 
 class LSTM(nn.Module):
-    """A basic LSTM model for quick testing.
-
-    """
+    """A basic LSTM model for quick testing."""
 
     def __init__(
         self, vocab_size, embedding_dim, hidden_dim, n_layers, n_classes
@@ -12,7 +12,14 @@ class LSTM(nn.Module):
         super().__init__()
         self.n_layers = n_layers
         self.hidden_size = hidden_dim
-        self.embed = nn.Embedding(vocab_size, embedding_dim)
+        self.embed = Embedding(
+            num_embeddings=vocab_size, embedding_dim=embedding_dim
+        )
+        self.embedder = BasicTextFieldEmbedder(
+            token_embedders={
+                "tokens": self.embed,
+            }
+        )
         self.lstm = nn.LSTM(
             embedding_dim,
             hidden_dim,
@@ -23,8 +30,8 @@ class LSTM(nn.Module):
         self.linear = nn.Linear(hidden_dim, n_classes)
 
         # initialize weight
-        nn.init.xavier_uniform_(self.embed.weight)
         nn.init.xavier_uniform_(self.linear.weight)
+        nn.init.xavier_uniform_(self.embed.weight)
         self.linear.bias.data.fill_(0)
 
     def forward(self, inputs):
@@ -32,7 +39,7 @@ class LSTM(nn.Module):
         Returns:
             The hidden state of the last layer in the lsat step.
         """
-        embeds = self.embed(inputs)
+        embeds = self.embedder(inputs)
         out, hidden = self.lstm(embeds)
         return self.linear(out[:, -1, :])
 

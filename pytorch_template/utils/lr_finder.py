@@ -4,6 +4,7 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.optim.lr_scheduler import _LRScheduler
+from typing import Iterator
 from .logger import getlogger
 
 
@@ -38,7 +39,7 @@ class LRFinder(object):
     fastai/lr_find: https://github.com/fastai/fastai
     """
 
-    def __init__(self, trainer: "Trainer"):
+    def __init__(self, trainer: "BaseTrainer"):
         self.logger = getlogger(__name__)
         self.trainer = trainer
         self.history = {"lr": [], "loss": []}
@@ -59,13 +60,13 @@ class LRFinder(object):
 
     def _forever_dataloader(self, dl):
         while True:
-            for X, y in dl:
-                yield X, y
+            for batch_dict in dl:
+                yield batch_dict
 
     def fit(
         self,
-        train_dl: "Iterator",
-        val_dl: "Iterator" = None,
+        train_dl: Iterator,
+        val_dl: Iterator = None,
         str_lr=1e-7,
         end_lr=10,
         num_iter=100,
@@ -119,17 +120,18 @@ class LRFinder(object):
         if smooth_f < 0 or smooth_f > 1:
             raise ValueError("smooth_f is outside the range [0, 1]")
 
-        for i, (train_X, train_y) in enumerate(
-            self._forever_dataloader(train_dl)
-        ):
+        for i, batch_dict in enumerate(self._forever_dataloader(train_dl)):
             if i == num_iter:
                 break
 
             self.history["lr"].append(lr_schedule.get_last_lr()[0])
-            loss = self._train_batch(train_X, train_y)
+            loss = self.trainer._training_step(batch_dict, i)["loss"]
+            loss.backward()
+            self.trainer.optimizer.step()
 
             if val_dl is not None:
-                loss = self._validate(val_dl)
+                self.trainer._validate(val_dl)
+                loss = torch.tensor(self.trainer.logs["val_loss"])
             lr_schedule.step()
             if i == 0:
                 best_loss = loss
@@ -142,7 +144,7 @@ class LRFinder(object):
                 if loss < best_loss:
                     best_loss = loss
 
-            self.history["loss"].append(loss)
+            self.history["loss"].append(loss.item())
             if loss > diverge_th * best_loss:
                 self.logger.info("Stopping early, the loss has diverged")
                 break
@@ -152,42 +154,6 @@ class LRFinder(object):
             "Learning rate search has finished. Model and "
             "optimizer weights has been restored."
         )
-
-    def _train_batch(self, train_X, train_y):
-        # Set model to training mode
-        self.trainer.model.train()
-
-        # Move data to the correct device
-        train_X = train_X.to(self.trainer.device)
-        train_y = train_y.to(self.trainer.device)
-
-        # Forward pass
-        self.trainer.optimizer.zero_grad()
-        outputs = self.trainer.model(train_X)
-        loss = self.trainer.criterion(outputs, train_y)
-
-        # Backward pass
-        loss.backward()
-        self.trainer.optimizer.step()
-        return loss.item()
-
-    def _validate(self, val_dl):
-        # Set model to evaluation mode and disable gradient computation
-        running_loss = 0
-        size = 0
-        self.trainer.model.eval()
-        with torch.no_grad():
-            for val_X, val_y in val_dl:
-                # Move data to the correct device
-                val_X = val_X.to(self.trainer.device)
-                val_y = val_y.to(self.trainer.device)
-
-                # Forward pass and loss computation
-                outputs = self.trainer.model(val_X)
-                loss = self.trainer.criterion(outputs, val_y)
-                running_loss += loss.item() * val_X.shape[0]
-                size += val_X.shape[0]
-        return running_loss / size
 
     def _set_learning_rate(self, new_lr):
         for param_group in self.trainer.optimizer.param_groups:

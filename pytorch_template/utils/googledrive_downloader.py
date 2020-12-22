@@ -10,32 +10,35 @@ DOWNLOAD_URL = "https://drive.google.com/uc?export=download"
 
 
 def download_from_googledrive(
-    file_id: str, dst_path: str = "", unzip: bool = True
+    file_id: str, dst_dir: str = "", unzip: bool = True
 ):
+    """
+    Args:
+        dst_dir: The folder to store the downloaded file.
+    """
     logger = getlogger(__name__)
     session = requests.Session()
     response = session.get(DOWNLOAD_URL, params={"id": file_id}, stream=True)
 
-    dst_dir, filename = os.path.split(dst_path)
+    #  dst_dir, filename = os.path.split(dst_path)
     if dst_dir and not os.path.exists(dst_dir):
         logger.info("Creating directory %s", dst_dir)
         os.makedirs(dst_dir)
-    filename = filename or re.search(
-        r"filename\=\"(.*)\"", response.headers["Content-Disposition"]
-    ).group(1)
-    dst_path = os.path.join(dst_dir, filename)
-
-    logger.info("Downloading %s...", filename)
 
     # If file size is too big, the page will display a warming
     # The way to crack it is to get the cookie value and
     # return it in params
     token = _get_confirm_token(response)
     if token:
+        logger.info(f"Got the confirm tokem.")
         response = session.get(
             DOWNLOAD_URL, params={"id": file_id, "confirm": token}, stream=True
         )
-
+    filename = re.search(
+        r"filename\=\"(.*)\"", response.headers["Content-Disposition"]
+    ).group(1)
+    dst_path = os.path.join(dst_dir, filename)
+    logger.info("Downloading %s...", filename)
     _save_response_content(response, dst_path)
 
     if unzip:

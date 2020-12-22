@@ -28,21 +28,20 @@ class Metric(Callback):
         self.reset()
 
     def on_train_batch_end(self, logs):
-        logs[self.name] = self(logs["last_y_true"], logs["last_y_pred"])
+        logs[self.name] = self(logs["y_true"], logs["y_pred"])
 
     def on_val_start(self, logs):
         self.reset()
 
-    def on_test_batch_end(self, logs):
-        logs["val_" + self.name] = self(
-            logs["last_y_true"], logs["last_y_pred"]
-        )
+    def on_val_batch_end(self, logs):
+        logs["val_" + self.name] = self(logs["y_true"], logs["y_pred"])
 
 
 class Accuracy(Metric):
-    def __init__(self):
+    def __init__(self, pad_id=None):
         self.n_samples = 0
         self.n_correct = 0
+        self.pad_id = pad_id
         super().__init__("acc")
 
     def __call__(self, y_true, y_pred):

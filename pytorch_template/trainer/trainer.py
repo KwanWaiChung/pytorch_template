@@ -1,5 +1,14 @@
-from typing import List, Union, Callable, Dict
-from ..callbacks import CallbackHandler, History, ProgressBar
+from typing import List, Union, Callable, Dict, Iterable, Any
+from copy import deepcopy
+from ..callbacks import (
+    CallbackHandler,
+    History,
+    ProgressBar,
+    GpuTrainer,
+    ModelCheckpoint,
+    EarlyStopping,
+)
+from torch.utils.data import DataLoader, BatchSampler, SequentialSampler
 import torch
 import torch.nn as nn
 
@@ -27,40 +36,116 @@ class BaseTrainer:
         model: nn.Module,
         criterion: nn.Module,
         optimizer: "optimizer",
-        device: torch.device = None,
         metrics: List["Metric"] = [],
         callbacks: List["Callback"] = [],
+        model_checkpoint: ModelCheckpoint = None,
+        early_stopping: EarlyStopping = None,
+        gpu: int = 0,
     ):
+        self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.metrics = metrics
+        #  model_checkpoint = model_checkpoint or ModelCheckpoint(
+        #      save_best_only=True
+        #  )
+        #  early_stopping = early_stopping or EarlyStopping()
+        post_callbacks = []
+        if early_stopping:
+            post_callbacks.append(early_stopping)
+        if model_checkpoint:
+            post_callbacks.append(model_checkpoint)
+        post_callbacks.append(ProgressBar())
         self.history = History()
         self.callbacks = CallbackHandler(
-            metrics + callbacks + [self.history, ProgressBar()], self
+            [GpuTrainer(gpu)]
+            + metrics
+            + [self.history]
+            + callbacks
+            + post_callbacks,
+            self,
         )
-        self.device = device or torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
-        self.model = model.to(self.device)
         self.use_val = False
         self.logs = {}
 
-    def fit(
-        self, train_dl: "Iterator", n_epochs: int, val_dl: "Iterator" = None
-    ):
+    def training_step(
+        self, batch_dict: Dict[str, torch.Tensor], batch_idx: int
+    ) -> Dict[str, Any]:
+        """Define a training step of the model.
+
+        Args:
+            batch_dict: Input for the model.
+            batch_idx: Current batch idx of this epoch.
+
+        Returns:
+            Dict with required keys:
+                loss (torch.Tensor): The avg loss of current batch.
+                batch_size (int): The batch size of current batch.
+                y_pred (torch.Tensor): The predicted tensor.
+                y_true (torch.Tensor): The ground truth tensor.
+
+        """
+        raise NotImplementedError
+
+    def validation_step(self, batch_dict, batch_idx):
+        """Define a validation step of the model.
+
+        Args:
+            batch_dict: Input for the model.
+            batch_idx: Current batch idx of this epoch.
+
+        Returns:
+            Dict with required keys:
+                val_loss (torch.Tensor): The avg loss of current batch.
+                batch_size (int): The batch size of current batch.
+                y_pred (torch.Tensor): The predicted tensor.
+                y_true (torch.Tensor): The ground truth tensor.
+
+        """
+        raise NotImplementedError
+
+    def _training_step(
+        self, batch_dict: Dict[str, torch.Tensor], batch_idx: int
+    ) -> Dict[str, Any]:
+        outputs = self.training_step(batch_dict, batch_idx)
+        for key in ["loss", "batch_size", "y_pred", "y_true"]:
+            if key not in outputs:
+                raise KeyError(
+                    f"`{key}` should be included in the returned dict "
+                    "of `training_step()`"
+                )
+        outputs["y_pred"] = outputs["y_pred"].detach().cpu()
+        outputs["y_true"] = outputs["y_true"].detach().cpu()
+        return outputs
+
+    def _validation_step(
+        self, batch_dict: Dict[str, torch.Tensor], batch_idx: int
+    ) -> Dict[str, Any]:
+        outputs = self.validation_step(batch_dict, batch_idx)
+        for key in ["val_loss", "batch_size", "y_pred", "y_true"]:
+            if key not in outputs:
+                raise KeyError(
+                    f"`{key}` should be included in the returned dict "
+                    "of `validation_step()`"
+                )
+        outputs["val_loss"] = outputs["val_loss"].item()
+        outputs["y_pred"] = outputs["y_pred"].detach().cpu()
+        outputs["y_true"] = outputs["y_true"].detach().cpu()
+        return outputs
+
+    def fit(self, train_dl: Iterable, n_epochs: int, val_dl: Iterable = None):
         if val_dl is not None:
             self.use_val = True
         self.logs["n_epochs"] = n_epochs
         self.callbacks.on_train_begin(self.logs)
-        for i in range(self.logs.get("epoch", 1), n_epochs + 1):
-            self.logs["epoch"] = i
-            if self.fit_epoch(train_dl, val_dl):
-                break
+        for i in range(self.logs.get("epoch_idx", 1), n_epochs + 1):
+            self.logs["epoch_idx"] = i
+            self.fit_epoch(train_dl, val_dl)
             if self.callbacks.on_epoch_end(self.logs):
                 break
         self.callbacks.on_train_end(self.logs)
 
-    def fit_epoch(self, train_dl: "Iterator", val_dl: "Iterator"):
+    def fit_epoch(self, train_dl: Iterable, val_dl: Iterable):
         """Run one training epoch.
 
         Returns:
@@ -68,74 +153,54 @@ class BaseTrainer:
         """
         self.logs["n_batches"] = len(train_dl)
         self.callbacks.on_epoch_begin(self.logs)
-        if self._train(train_dl):
-            return True
+        self._train(train_dl)
         if self.use_val:
             self._validate(val_dl)
-        return False
 
     def _train(self, train_dl):
         """Training for one epoch.
 
         Returns:
             bool: True, if early stop after trained certain batches.
+
         """
         self.model.train()
-        for i, (train_X, train_y) in enumerate(train_dl, 1):
-            train_X = train_X.to(self.device)
-            train_y = train_y.to(self.device)
-            self.logs["last_X"] = train_X
-            self.logs["last_y_true"] = train_y
-            self.logs["batch"] = i
-            self.logs["batch_size"] = train_X.shape[0]
+        for i, batch_dict in enumerate(train_dl, 1):
+            self.logs["batch_dict"] = batch_dict
+            self.logs["batch_idx"] = i
             self.callbacks.on_train_batch_begin(self.logs)
 
-            output = self.model(self.logs["last_X"])
-            self.logs["last_y_pred"] = output
-
-            self.callbacks.on_loss_begin(self.logs)
-            loss = self.criterion(
-                self.logs["last_y_pred"], self.logs["last_y_true"]
-            )
-            # loss.data is the avg loss of this batch
-            self.logs["loss"] = loss.item()
+            outputs = self._training_step(self.logs["batch_dict"], batch_idx=i)
+            loss = outputs["loss"]
+            self.logs.update(outputs)
             self.callbacks.on_loss_end(self.logs)
 
             self.optimizer.zero_grad()
             loss.backward()
             self.callbacks.on_step_begin(self.logs)
             self.optimizer.step()
-            if self.callbacks.on_train_batch_end(self.logs):
-                return True
-        return False
+            self.callbacks.on_train_batch_end(self.logs)
 
     def _validate(self, val_dl):
         self.model.eval()
         self.logs["n_batches"] = len(val_dl)
         self.callbacks.on_val_begin(self.logs)
         with torch.no_grad():
-            for i, (val_X, val_y) in enumerate(val_dl, 1):
-                val_X = val_X.to(self.device)
-                val_y = val_y.to(self.device)
-                self.logs["last_X"] = val_X
-                self.logs["last_y_true"] = val_y
-                self.logs["batch"] = i
-                self.logs["batch_size"] = val_X.shape[0]
-                self.callbacks.on_test_batch_begin(self.logs)
+            for i, batch_dict in enumerate(val_dl, 1):
+                self.logs["batch_dict"] = batch_dict
+                self.logs["batch_idx"] = i
+                self.callbacks.on_val_batch_begin(self.logs)
 
-                output = self.model(self.logs["last_X"])
-
-                self.logs["last_y_pred"] = output
-                self.callbacks.on_loss_begin(self.logs)
-                loss = self.criterion(
-                    self.logs["last_y_pred"], self.logs["last_y_true"]
+                outputs = self._validation_step(
+                    self.logs["batch_dict"], batch_idx=i
                 )
-                self.callbacks.on_loss_end(self.logs)
-                self.logs["val_loss"] = loss.item()
-                self.callbacks.on_test_batch_end(self.logs)
+                self.logs.update(outputs)
+                self.callbacks.on_val_batch_end(self.logs)
+        self.callbacks.on_val_end(self.logs)
 
     def _getstate(self):
-        """Get all the related state dicts for saving
+        """Get all the related state dicts for saving.
+        Will be called from model_checkpoint callback.
 
         Returns:
             dict

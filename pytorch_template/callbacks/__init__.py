@@ -5,4 +5,5 @@ from .parallel_trainer import ParallelTrainer
 from .argmax import Argmax
 from .early_stopping import EarlyStopping
 from .model_checkpoint import ModelCheckpoint
-from .tensorboard import TensorBoard
+from .train_logger import Wandblogger
+from .gpu_trainer import GpuTrainer

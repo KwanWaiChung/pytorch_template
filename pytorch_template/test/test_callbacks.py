@@ -6,14 +6,19 @@ from ..callbacks import (
     Argmax,
     ModelCheckpoint,
     EarlyStopping,
-    TensorBoard,
+    Wandblogger,
 )
 from ..trainer import BaseTrainer
 from ..metrics import Accuracy
 from ..utils.logger import getlogger
-from .utils.stub.mock_handler import MockLoggingHandler
+from .utils.stub import (
+    RegressionTrainer,
+    ClassificationTrainer,
+    MockLoggingHandler,
+)
 from .utils.model import LSTM
 from .utils.dataset import getYelpDataloader
+from ..utils.misc import set_seed
 from collections import namedtuple
 import random
 import copy
@@ -22,6 +27,7 @@ import torch.nn as nn
 import os
 import shutil
 import pytest
+from time import sleep
 
 handler = MockLoggingHandler(level="DEBUG")
 logger = getlogger()
@@ -31,156 +37,112 @@ torch.manual_seed(170)
 
 
 class TestingCallback(Callback):
+    def __init__(self, metric: str = None):
+        super().__init__()
+        self.metric = metric
+
     def on_train_begin(self, logs):
         logger.info("begin training")
         assert "n_epochs" in logs
-
-    def on_train_end(self, logs):
-        logger.info("end training")
-        assert "n_epochs" in logs
+        assert type(logs["n_epochs"]) == int
 
     def on_epoch_begin(self, logs):
         logger.info("begin epoch")
-        assert "n_epochs" in logs
-        assert "epoch" in logs
-
-    def on_epoch_end(self, logs):
-        logger.info("end epoch")
-        assert "n_epochs" in logs
-        assert "epoch" in logs
-        return False
-
-    def on_loss_begin(self, logs):
-        logger.info("begin loss")
-        assert "last_y_pred" in logs
-        assert "n_epochs" in logs
-        assert "epoch" in logs
-        assert "last_X" in logs
-        assert "last_y_true" in logs
-        assert "batch" in logs
+        assert "epoch_idx" in logs
+        assert type(logs["epoch_idx"]) == int
         assert "n_batches" in logs
+        assert type(logs["n_batches"]) == int
+
+    def on_train_batch_begin(self, logs):
+        logger.info("begin train batch")
+        assert "batch_dict" in logs
+        assert type(logs["batch_dict"]) == dict
+        assert "batch_idx" in logs
+        assert type(logs["batch_idx"]) == int
 
     def on_loss_end(self, logs):
         logger.info("end loss")
         assert "loss" in logs
+        assert type(logs["loss"]) == float
+        assert "y_pred" in logs
+        assert type(logs["y_pred"]) == torch.Tensor
+        assert "y_true" in logs
+        assert type(logs["y_true"]) == torch.Tensor
+        assert "batch_size" in logs
+        assert type(logs["batch_size"]) == int
 
     def on_step_begin(self, logs):
         logger.info("begin step")
-        assert "loss" in logs
-        assert "last_y_pred" in logs
-        assert "n_epochs" in logs
-        assert "epoch" in logs
-        assert "last_X" in logs
-        assert "last_y_true" in logs
-        assert "batch" in logs
-        assert "n_batches" in logs
-
-    def on_train_batch_begin(self, logs):
-        logger.info("begin train batch")
-        assert "n_epochs" in logs
-        assert "epoch" in logs
-        assert "last_X" in logs
-        assert "last_y_true" in logs
-        assert "batch" in logs
-        assert "n_batches" in logs
 
     def on_train_batch_end(self, logs):
         logger.info("end train batch")
+        if self.metric:
+            assert self.metric in logs
+            assert type(logs[self.metric]) == float
 
-    def on_test_batch_begin(self, logs):
-        logger.info("begin test batch")
+    def on_val_begin(self, logs):
+        logger.info("begin validating")
+        assert "epoch_idx" in logs
+        assert type(logs["epoch_idx"]) == int
         assert "n_epochs" in logs
-        assert "epoch" in logs
-        assert "last_X" in logs
-        assert "last_y_true" in logs
-        assert "batch" in logs
+        assert type(logs["n_epochs"]) == int
         assert "n_batches" in logs
+        assert type(logs["n_batches"]) == int
 
-    def on_test_batch_end(self, logs):
-        logger.info("end test batch")
-        assert "last_y_pred" in logs
+    def on_val_batch_begin(self, logs):
+        logger.info("begin val batch")
+        assert "batch_dict" in logs
+        assert type(logs["batch_dict"]) == dict
+        assert "batch_idx" in logs
+        assert type(logs["batch_idx"]) == int
+        assert "n_batches" in logs
+        assert type(logs["n_batches"]) == int
+        assert "n_epochs" in logs
+        assert type(logs["n_epochs"]) == int
+        assert "batch_size" in logs
+        assert type(logs["batch_size"]) == int
+        assert "epoch_idx" in logs
+        assert type(logs["epoch_idx"]) == int
+
+    def on_val_batch_end(self, logs):
+        logger.info("end val batch")
+        if self.metric:
+            assert f"val_{self.metric}" in logs
+            assert type(logs[f"val_{self.metric}"]) == float
         assert "val_loss" in logs
+        assert type(logs["val_loss"]) == float
+        assert "y_pred" in logs
+        assert type(logs["y_pred"]) == torch.Tensor
+        assert "y_true" in logs
+        assert type(logs["y_true"]) == torch.Tensor
 
+    def on_val_end(self, logs):
+        logger.info("end val")
 
-class DummyTrainer:
-    def __init__(self, callbacks):
-        self.history = History()
-        self.callbacks = CallbackHandler([self.history] + callbacks, self)
-        self.metrics = []
-        self.logs = {}
-        self.n_batches = 3
-        self.batch_size = 5
-        self.use_val = True
+    def on_epoch_end(self, logs):
+        logger.info("end epoch")
+        assert "val_loss" in logs
+        assert "loss" in logs
+        assert "n_epochs" in logs
+        assert "epoch_idx" in logs
+        return False
 
-    def fit(self, n_epochs):
-        self.logs["n_epochs"] = n_epochs
-        self.callbacks.on_train_begin(self.logs)
-        for i in range(1, n_epochs + 1):
-            self.logs["epoch"] = i
-            self.fit_epoch()
-            if self.callbacks.on_epoch_end(self.logs):
-                break
-        self.callbacks.on_train_end(self.logs)
-
-    def fit_epoch(self):
-        #  self.model.train()
-        self.logs["n_batches"] = self.n_batches
-        self.callbacks.on_epoch_begin(self.logs)
-        for i in range(self.logs["n_batches"]):
-            self.logs["last_X"] = torch.randn(2, 2)
-            self.logs["last_y_true"] = torch.randn(2)
-            self.logs["batch"] = i
-            self.logs["batch_size"] = self.batch_size
-            self.callbacks.on_train_batch_begin(self.logs)
-
-            #  output = self.model(self.logs["last_X"])
-
-            self.logs["last_y_pred"] = torch.randn(2)
-            self.callbacks.on_loss_begin(self.logs)
-            #  loss = self.criterion()
-            self.logs["loss"] = (
-                ((self.logs["last_y_pred"] - self.logs["last_y_true"]) ** 2)
-                .mean()
-                .item()
-            )
-            self.callbacks.on_loss_end(self.logs)
-
-            #  loss.backward()
-            self.callbacks.on_step_begin(self.logs)
-            #  self.optimizer.step()
-            self.callbacks.on_train_batch_end(self.logs)
-
-        # validation
-        self.logs["n_batches"] = self.n_batches
-        self.callbacks.on_val_begin(self.logs)
-        for i in range(self.logs["n_batches"]):
-            self.logs["last_X"] = torch.randn(2, 2)
-            self.logs["last_y_true"] = torch.randn(1)
-            self.logs["batch"] = i
-            self.logs["batch_size"] = self.batch_size
-            self.callbacks.on_test_batch_begin(self.logs)
-
-            #  output = self.model(self.logs["last_X"])
-
-            self.logs["last_y_pred"] = torch.randn(1)
-
-            #  loss = self.criterion()
-
-            self.logs["val_loss"] = (
-                (self.logs["last_y_pred"] - self.logs["last_y_true"]) ** 2
-            ).item()
-            self.callbacks.on_test_batch_end(self.logs)
+    def on_train_end(self, logs):
+        logger.info("end training")
+        assert "n_epochs" in logs
+        assert type(logs["n_epochs"]) == int
 
 
 class DummyTrainer2:
     metric = namedtuple("Metric", ["name"])
 
     def __init__(self):
-        self.metrics = []
+        self.metrics = [self.metric("acc")]
         self.use_val = True
 
 
 def test_history():
+    set_seed(1337)
     n_epochs = 2
     n_batches = 3
     batch_size = 5
@@ -188,13 +150,18 @@ def test_history():
     h.set_trainer(DummyTrainer2())
     loss = torch.randn(n_epochs, n_batches)
     val_loss = torch.randn(n_epochs, n_batches)
-    for e, (l, val_l) in enumerate(zip(loss, val_loss)):
+    acc = torch.randn(n_epochs, n_batches)
+    val_acc = torch.randn(n_epochs, n_batches)
+    for e, (l, val_l, a, val_a) in enumerate(
+        zip(loss, val_loss, acc, val_acc)
+    ):
         h.on_epoch_begin()
-        for b, _l in enumerate(l):
+        for b, (_l, _a) in enumerate(zip(l, a)):
             h.on_train_batch_end(
                 {
+                    "acc": _a.item(),
                     "loss": _l.item(),
-                    "batch": b,
+                    "batch_idx": b,
                     "batch_size": batch_size,
                     "n_batches": n_batches,
                     "epoch": e,
@@ -202,69 +169,70 @@ def test_history():
                 }
             )
         h.on_val_begin()
-        for b, _val_l in enumerate(val_l):
-            h.on_test_batch_end(
+        for b, (_val_l, _val_a) in enumerate(zip(val_l, val_a)):
+            h.on_val_batch_end(
                 {
+                    "val_acc": _val_a.item(),
                     "val_loss": _val_l.item(),
-                    "batch": b,
+                    "batch_idx": b,
                     "batch_size": batch_size,
                     "n_batches": n_batches,
                     "epoch": e,
                     "n_epoches": n_epochs,
                 }
             )
-        h.on_epoch_end({"epoch": e + 1, "n_epochs": n_epochs, "val_loss": 123})
+        h.on_epoch_end(
+            {
+                "epoch_idx": e + 1,
+                "n_epochs": n_epochs,
+                "acc": acc[-1, -1],
+                "val_acc": val_acc[-1, -1],
+            }
+        )
     assert h.epoch == list(range(1, n_epochs + 1))
+    # rolling average is done in History
     assert torch.allclose(torch.tensor(h.history["loss"]), loss.mean(dim=1))
     assert torch.allclose(
         torch.tensor(h.history["val_loss"]), val_loss.mean(dim=1)
     )
+    # metric average is done in Metric, History will just take the value
+    assert torch.allclose(torch.tensor(h.history["acc"]), acc[-1, -1])
+    assert torch.allclose(torch.tensor(h.history["val_acc"]), val_acc[-1, -1])
 
 
 def test_callback_basic():
-    trainer = DummyTrainer([TestingCallback()])
-    trainer.fit(3)
+    set_seed(170)
+    lr = 1e-2
+    train_dl, val_dl, vocab_size = getYelpDataloader()
 
-
-def test_progress_bar():
-    trainer = DummyTrainer([ProgressBar()])
-    trainer.fit(2)
-
-
-def test_argmax():
-    class ArgmaxTrainer:
-        def __init__(self):
-            self.callbacks = CallbackHandler([Argmax()], self)
-            self.logs = {}
-
-        def fit(self, n_epochs):
-            for i in range(1, n_epochs + 1):
-                self.fit_epoch()
-
-        def fit_epoch(self):
-            # assume one batch only
-            self.logs["last_y_pred"] = torch.tensor(
-                [[1, 2, 3, 4], [1, 2, 4, 3], [1, 4, 2, 3], [4, 1, 2, 3]]
-            )
-            self.callbacks.on_loss_end(self.logs)
-            assert (
-                self.logs["last_y_pred"]
-                == torch.tensor([3, 2, 1, 0], dtype=torch.int64)
-            ).all()
-
-    trainer = ArgmaxTrainer()
-    trainer.fit(1)
+    model = LSTM(
+        vocab_size=vocab_size,
+        embedding_dim=30,
+        hidden_dim=10,
+        n_layers=1,
+        n_classes=2,
+    )
+    trainer = ClassificationTrainer(
+        model=model,
+        criterion=nn.CrossEntropyLoss(),
+        optimizer=torch.optim.Adam(model.parameters(), lr=lr),
+        callbacks=[TestingCallback()],
+        metrics=[Accuracy()],
+    )
+    trainer.fit(train_dl=train_dl, n_epochs=3, val_dl=val_dl)
+    if os.path.exists("saved"):
+        shutil.rmtree("saved")
 
 
 class TestModelCheckpoint:
     def setup_method(self, method):
-        torch.manual_seed(170)
+        set_seed(170)
         self.lr = 1e-2
         self.handler = MockLoggingHandler(level="DEBUG")
         logger = getlogger()
         logger.parent.addHandler(self.handler)
 
-        self.train_dl, self.val_dl, vocab_size = getYelpDataloader(full=False)
+        self.train_dl, self.val_dl, vocab_size = getYelpDataloader()
         self.model = LSTM(
             vocab_size=vocab_size,
             embedding_dim=30,
@@ -274,16 +242,16 @@ class TestModelCheckpoint:
         )
 
     def teardown_method(self, method):
-        if os.path.exists("save"):
-            shutil.rmtree("save")
+        if os.path.exists("saved"):
+            shutil.rmtree("saved")
 
     def get_trainer(self, model_checkpoint):
-        return BaseTrainer(
+        return ClassificationTrainer(
             model=self.model,
             criterion=nn.CrossEntropyLoss(),
             optimizer=torch.optim.Adam(self.model.parameters(), lr=self.lr),
+            model_checkpoint=model_checkpoint,
             metrics=[Accuracy()],
-            callbacks=[Argmax(), model_checkpoint],
         )
 
     def test_model_checkpoint_always_save(self):
@@ -291,11 +259,13 @@ class TestModelCheckpoint:
             ModelCheckpoint(save_best_only=False, save_weights_only=True)
         )
         trainer.fit(self.train_dl, 2, self.val_dl)
-        assert len(os.listdir("save")) == 2
-        assert "checkpoint_01_0.69.pth" in os.listdir("save")
-        assert "checkpoint_02_0.59.pth" in os.listdir("save")
+        assert len(os.listdir("saved/models")) == 2
+        assert "checkpoint_01_0.6704.pth" in os.listdir("saved/models")
+        assert "checkpoint_02_0.6076.pth" in os.listdir("saved/models")
 
-        state_dict = torch.load(os.path.join("save", "checkpoint_02_0.59.pth"))
+        state_dict = torch.load(
+            os.path.join("saved/models", "checkpoint_02_0.6076.pth")
+        )
 
         for (k1, v1), (k2, v2) in zip(
             state_dict["model_state_dict"].items(),
@@ -313,31 +283,50 @@ class TestModelCheckpoint:
             assert v1 == v2
 
     def test_model_checkpoint_save_best(self):
-        trainer = self.get_trainer(
-            ModelCheckpoint(save_best_only=True, save_weights_only=True)
-        )
-        trainer.fit(self.train_dl, 10, self.val_dl)
-        assert len(os.listdir("save")) == 5
-        assert "checkpoint_01_0.69.pth" in os.listdir("save")
-        assert "checkpoint_02_0.59.pth" in os.listdir("save")
-        assert "checkpoint_05_0.34.pth" in os.listdir("save")
+        ckpt = ModelCheckpoint(save_best_only=True, save_weights_only=True)
+        trainer = self.get_trainer(ckpt)
+        trainer.fit(self.train_dl, 20, self.val_dl)
+        assert len(os.listdir("saved/models")) == 5
+        assert "checkpoint_01_0.6704.pth" in os.listdir("saved/models")
+        assert "checkpoint_02_0.6076.pth" in os.listdir("saved/models")
+        assert "checkpoint_03_0.5325.pth" in os.listdir("saved/models")
+        assert "checkpoint_04_0.2953.pth" in os.listdir("saved/models")
+        assert "last.pth" in os.listdir("saved/models")
+        assert ckpt.best_filepath == "saved/models/checkpoint_04_0.2953.pth"
 
-        state_dict = torch.load(os.path.join("save", "checkpoint_05_0.34.pth"))
+        state_dict = torch.load(
+            os.path.join("saved/models", "checkpoint_02_0.6076.pth")
+        )
         assert "model_state_dict" in state_dict
         assert "optimizer_state_dict" in state_dict
 
-        # check max epoch == 5
-        assert max([int(s.split("_")[1][1]) for s in os.listdir("save")]) == 5
+    def test_model_checkpoint_max_save(self):
+        ckpt = ModelCheckpoint(max_save=2)
+        trainer = self.get_trainer(ckpt)
+        trainer.fit(self.train_dl, 4, self.val_dl)
+        assert len(os.listdir("saved/models")) == 2
+        assert (
+            self.handler.messages["info"][-1] == "Removed oldest checkpoint: "
+            "saved/models/checkpoint_02_0.6076.pth"
+        )
+        assert (
+            self.handler.messages["info"][-2] == "Removed oldest checkpoint: "
+            "saved/models/checkpoint_01_0.6704.pth"
+        )
+        assert "checkpoint_03_0.5325.pth" in os.listdir("saved/models")
+        assert "checkpoint_04_0.2953.pth" in os.listdir("saved/models")
 
     def test_model_checkpoint_save_model(self):
         trainer = self.get_trainer(
             ModelCheckpoint(save_best_only=False, save_weights_only=False)
         )
         trainer.fit(self.train_dl, 1, self.val_dl)
-        assert len(os.listdir("save")) == 1
-        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+        assert len(os.listdir("saved/models")) == 1
+        assert "checkpoint_01_0.6704.pth" in os.listdir("saved/models")
 
-        state_dict = torch.load(os.path.join("save", "checkpoint_01_0.69.pth"))
+        state_dict = torch.load(
+            os.path.join("saved/models", "checkpoint_01_0.6704.pth")
+        )
         assert "model" in state_dict
         assert "model_state_dict" not in state_dict
         assert "optimizer_state_dict" not in state_dict
@@ -348,7 +337,7 @@ class TestModelCheckpoint:
         )
         trainer.model = model
         trainer._validate(self.val_dl)
-        assert round(trainer.logs["val_loss"], 2) == 0.69
+        assert round(trainer.logs["val_loss"], 4) == 0.6704
 
     def test_model_checkpoint_save_weights(self):
         model = copy.deepcopy(self.model)
@@ -356,8 +345,8 @@ class TestModelCheckpoint:
             ModelCheckpoint(save_best_only=False, save_weights_only=True)
         )
         trainer.fit(self.train_dl, 1, self.val_dl)
-        assert len(os.listdir("save")) == 1
-        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+        assert len(os.listdir("saved/models")) == 1
+        assert "checkpoint_01_0.6704.pth" in os.listdir("saved/models")
         # check if unequal after trained one epoch
         for (k1, v1), (k2, v2) in zip(
             model.state_dict().items(), trainer.model.state_dict().items()
@@ -366,7 +355,9 @@ class TestModelCheckpoint:
             assert (v1 != v2).any()
 
         # load pickle and check if parameters are the same
-        state_dict = torch.load(os.path.join("save", "checkpoint_01_0.69.pth"))
+        state_dict = torch.load(
+            os.path.join("saved/models", "checkpoint_01_0.6704.pth")
+        )
         model.load_state_dict(state_dict["model_state_dict"])
         for (k1, v1), (k2, v2) in zip(
             model.state_dict().items(), trainer.model.state_dict().items()
@@ -378,23 +369,25 @@ class TestModelCheckpoint:
         )
         trainer.model = model
         trainer._validate(self.val_dl)
-        assert round(trainer.logs["val_loss"], 2) == 0.69
+        assert round(trainer.logs["val_loss"], 4) == 0.6704
 
     def test_model_checkpoint_filepath(self):
         trainer = self.get_trainer(
             ModelCheckpoint(
-                filepath="save/checkpoint_{epoch:02d}_{loss:.3f}_"
-                "{val_loss:.3f}_{val_acc:.3f}.pth",
+                filepath="saved/models/checkpoint_{epoch_idx:02d}_{loss:.4f}_"
+                "{val_loss:.4f}_{val_acc:.4f}.pth",
                 save_best_only=False,
                 save_weights_only=True,
             )
         )
         trainer.fit(self.train_dl, 1, self.val_dl)
-        assert len(os.listdir("save")) == 1
-        assert "checkpoint_01_0.716_0.686_0.471.pth" in os.listdir("save")
+        assert len(os.listdir("saved/models")) == 1
+        assert "checkpoint_01_0.6803_0.6704_0.6333.pth" in os.listdir(
+            "saved/models"
+        )
 
     def test_model_checkpoint_with_invalid_filepath(self):
-        filepath = "save/checkpoint_{no:02d}"
+        filepath = "saved/models/checkpoint_{no:02d}"
         trainer = self.get_trainer(
             ModelCheckpoint(
                 filepath=filepath, save_best_only=False, save_weights_only=True
@@ -407,8 +400,9 @@ class TestModelCheckpoint:
                 filepath, "no"
             ) in str(e.value)
 
-    def test_model_checkpoint_restore_training(self):
-        filepath = "save/checkpoint_{epoch:02d}_{val_loss:.2f}.pth"
+    def test_model_checkpoint_restore_training_save_weights(self):
+        filepath = "saved/models/checkpoint_{epoch_idx:02d}_{val_loss:.4f}.pth"
+        #  filepath = "save/last.pth"
         trainer = self.get_trainer(
             ModelCheckpoint(
                 save_best_only=False,
@@ -420,37 +414,79 @@ class TestModelCheckpoint:
         trainer.fit(self.train_dl, 1, self.val_dl)
         assert (
             self.handler.messages["info"][-1]
-            == filepath + " is not found. Start training from scratch."
+            == f"{filepath} is not found. Start training from scratch."
         )
-        assert "checkpoint_01_0.69.pth" in os.listdir("save")
+        assert "checkpoint_01_0.6704.pth" in os.listdir("saved/models")
 
         # Resume training
         trainer.fit(self.train_dl, 2, self.val_dl)
         assert (
             self.handler.messages["info"][-1]
-            == "Model weights loaded. Resuming training at 2 epoch"
+            == "Model weights loaded from saved/models/checkpoint_01_0.6704.pth. "
+            "Resuming training at 2 epoch"
         )
-        assert "checkpoint_02_0.59.pth" in os.listdir("save")
+        assert "checkpoint_02_0.6076.pth" in os.listdir("saved/models")
+
+    def test_model_checkpoint_restore_training_save_best_weights(self):
+        #  filepath = "save/last.pth"
+        ckpt = ModelCheckpoint(
+            save_best_only=True,
+            save_weights_only=True,
+            load_weights_on_restart=True,
+        )
+        trainer = self.get_trainer(ckpt)
+        trainer.fit(self.train_dl, 1, self.val_dl)
+        assert (
+            self.handler.messages["info"][-1]
+            == "saved/models/last.pth is not found. Start training from scratch."
+        )
+        assert "checkpoint_01_0.6704.pth" in os.listdir("saved/models")
+        assert "last.pth" in os.listdir("saved/models")
+        modtime = os.path.getmtime("saved/models/last.pth")
+
+        ckpt = ModelCheckpoint(
+            save_best_only=True,
+            save_weights_only=True,
+            load_weights_on_restart=True,
+        )
+        trainer = self.get_trainer(ckpt)
+        ckpt.on_train_begin({})
+        for value in trainer.callbacks.callbacks:
+            if isinstance(value, ModelCheckpoint):
+                assert (
+                    value.best_filepath
+                    == "saved/models/checkpoint_01_0.6704.pth"
+                )
+        # Resume training
+        sleep(1)
+        trainer.fit(self.train_dl, 2, self.val_dl)
+        assert (
+            self.handler.messages["info"][-1]
+            == "Model weights loaded from saved/models/last.pth. "
+            "Resuming training at 2 epoch"
+        )
+        assert "checkpoint_02_0.6076.pth" in os.listdir("saved/models")
+        assert os.path.getmtime("saved/models/last.pth") > modtime
 
     def test_model_checkpoint_restore_training_with_latest_checkpoint(self):
-        filepath = "save/checkpoint_{epoch:02d}_{val_loss:.2f}.pth"
         trainer = self.get_trainer(
             ModelCheckpoint(
                 save_best_only=False,
                 save_weights_only=True,
                 load_weights_on_restart=True,
-                filepath=filepath,
             )
         )
+        trainer.delay = True
         trainer.fit(self.train_dl, 2, self.val_dl)
 
         # Resume training
         trainer.fit(self.train_dl, 3, self.val_dl)
         assert (
             self.handler.messages["info"][-1]
-            == "Model weights loaded. Resuming training at 3 epoch"
+            == "Model weights loaded from saved/models/checkpoint_02_0.6076.pth. "
+            "Resuming training at 3 epoch"
         )
-        assert "checkpoint_03_0.48.pth" in os.listdir("save")
+        assert "checkpoint_03_0.5325.pth" in os.listdir("saved/models")
 
     def test_model_checkpoint_mode(self):
         # pretend that higher val_loss means better for testing
@@ -464,11 +500,10 @@ class TestModelCheckpoint:
             )
         )
         trainer.fit(self.train_dl, 7, self.val_dl)
-
-        assert len(os.listdir("save")) == 3
-        assert "checkpoint_01_0.69.pth" in os.listdir("save")
-        assert "checkpoint_06_0.78.pth" in os.listdir("save")
-        assert "checkpoint_07_1.63.pth" in os.listdir("save")
+        assert len(os.listdir("saved/models")) == 3
+        assert "checkpoint_01_0.6704.pth" in os.listdir("saved/models")
+        assert "checkpoint_07_0.8819.pth" in os.listdir("saved/models")
+        assert "last.pth" in os.listdir("saved/models")
 
     def test_model_checkpoint_monitor_wrong_metric(self):
         trainer = self.get_trainer(
@@ -487,29 +522,16 @@ class TestModelCheckpoint:
                 e.value
             )
 
-    def test_model_checkpoint_with_additional_save_dict(self):
-        trainer = self.get_trainer(
-            ModelCheckpoint(
-                save_best_only=False,
-                save_weights_only=True,
-                save_dict={"addition": 1},
-            )
-        )
-        trainer.fit(self.train_dl, 1, self.val_dl)
-        state_dict = torch.load(os.path.join("save", "checkpoint_01_0.69.pth"))
-        assert state_dict["addition"] == 1
-
 
 class TestEarlyStopping:
     def setup_method(self, method):
-        os.makedirs("save", exist_ok=True)
-        torch.manual_seed(170)
+        set_seed(170)
         self.lr = 1e-2
         self.handler = MockLoggingHandler(level="DEBUG")
         logger = getlogger()
         logger.parent.addHandler(self.handler)
 
-        self.train_dl, self.val_dl, vocab_size = getYelpDataloader(full=False)
+        self.train_dl, self.val_dl, vocab_size = getYelpDataloader()
         self.model = LSTM(
             vocab_size=vocab_size,
             embedding_dim=30,
@@ -519,21 +541,26 @@ class TestEarlyStopping:
         )
 
     def teardown_method(self, method):
-        if os.path.exists("save"):
-            shutil.rmtree("save")
+        if os.path.exists("saved/models"):
+            shutil.rmtree("saved/models")
 
-    def get_trainer(self, callbacks):
-        return BaseTrainer(
+    def get_trainer(self, early_stopping, model_checkpoint=None):
+        return ClassificationTrainer(
             model=self.model,
             criterion=nn.CrossEntropyLoss(),
             optimizer=torch.optim.Adam(self.model.parameters(), lr=self.lr),
+            early_stopping=early_stopping,
+            model_checkpoint=model_checkpoint,
             metrics=[Accuracy()],
-            callbacks=[Argmax()] + callbacks,
         )
 
     def test_early_stopping_patience(self):
-        trainer = self.get_trainer([EarlyStopping(patience=2)])
+        trainer = self.get_trainer(EarlyStopping(patience=2))
         trainer.fit(self.train_dl, 10, self.val_dl)
+        for value in trainer.callbacks.callbacks:
+            if isinstance(value, EarlyStopping):
+                assert value.wait == 2
+                assert abs(value.best_score - 0.2953) < 1e-4
         assert len(trainer.history.history["val_loss"]) == 7
 
     def test_early_stopping_pickle(self):
@@ -541,59 +568,81 @@ class TestEarlyStopping:
         callback.on_train_begin({})
         callback.best_score = 0.5
         callback.patience = 2
-        torch.save({"c": callback}, "save/save.pth")
-        c = torch.load("save/save.pth")
+        os.makedirs("saved/models", exist_ok=True)
+        torch.save({"c": callback}, "saved/models/save.pth")
+        c = torch.load("saved/models/save.pth")
         assert c["c"].best_score == 0.5
         assert c["c"].patience == 2
 
     def test_early_stopping_model_checkpoint_integration(self):
-        early_stop = EarlyStopping(patience=3)
+        early_stopping = EarlyStopping(patience=4)
         model_checkpoint = ModelCheckpoint(
             save_best_only=False,
             save_weights_only=True,
-            save_dict={"early_stopping": early_stop},
             load_weights_on_restart=True,
         )
-        trainer = self.get_trainer([early_stop, model_checkpoint])
+        trainer = self.get_trainer(
+            early_stopping=early_stopping, model_checkpoint=model_checkpoint
+        )
+        trainer.delay = True
         trainer.fit(self.train_dl, 7, self.val_dl)
+        for value in trainer.callbacks.callbacks:
+            if isinstance(value, EarlyStopping):
+                assert value.wait == 3
+                assert abs(value.best_score - 0.2953) < 1e-4
 
-        # resume training
-        early_stop = EarlyStopping(patience=3)
+        # resume
+        early_stop = EarlyStopping(patience=5)
         model_checkpoint = ModelCheckpoint(
             save_best_only=False,
             save_weights_only=True,
-            save_dict={"early_stopping": early_stop},
             load_weights_on_restart=True,
         )
-        trainer = self.get_trainer([early_stop, model_checkpoint])
+        trainer = self.get_trainer(
+            early_stopping=early_stopping, model_checkpoint=model_checkpoint
+        )
         model_checkpoint.on_train_begin({})
         for value in trainer.callbacks.callbacks:
             if isinstance(value, EarlyStopping):
                 assert value.wait == 3
-                assert abs(value.best_score - 0.342) < 1e-3
+                assert abs(value.best_score - 0.2953) < 1e-4
 
         trainer.fit(self.train_dl, 10, self.val_dl)
-        assert trainer.history.epoch[-1] == 8
+        assert trainer.history.epoch[-1] == 9
 
 
-class TestTensorboard:
-    def test_tensorboard(self):
-        tensorBoard = TensorBoard("logs")
-        metric = namedtuple("Metric", ["name"])
-        trainer = namedtuple("Trainer", ["use_val", "metrics"])(
-            True, [metric("f1")]
-        )
-        tensorBoard.set_trainer(trainer)
+#  class TestTrainLogger:
+#      def setup_method(self, method):
+#          set_seed(170)
+#          self.lr = 1e-2
+#          self.handler = MockLoggingHandler(level="DEBUG")
+#          logger = getlogger()
+#          logger.parent.addHandler(self.handler)
 
-        for i in range(1, 21):
-            tensorBoard.on_epoch_end(
-                {
-                    "loss": random.random(),
-                    "val_loss": random.random(),
-                    "f1": random.random(),
-                    "val_f1": random.random(),
-                    "epoch": i,
-                }
-            )
-        if os.path.exists("logs"):
-            shutil.rmtree("logs")
+#          self.train_dl, self.val_dl, vocab_size = getYelpDataloader()
+#          self.model = LSTM(
+#              vocab_size=vocab_size,
+#              embedding_dim=30,
+#              hidden_dim=10,
+#              n_layers=1,
+#              n_classes=2,
+#          )
+
+#      def get_trainer(self, callbacks):
+#          return ClassificationTrainer(
+#              model=self.model,
+#              criterion=nn.CrossEntropyLoss(),
+#              optimizer=torch.optim.Adam(self.model.parameters(), lr=self.lr),
+#              callbacks=callbacks,
+#              metrics=[Accuracy()],
+#          )
+
+#      # disable this test as it will create the ckpt which
+#      # we can't delete for this test case
+#      def test_wandb(self):
+#          logger = Wandblogger(
+#              "Testing", "testin123", config={"param1": 100, "param2": 200}
+#          )
+#          trainer = self.get_trainer([logger])
+#          trainer.delay = True
+#          trainer.fit(self.train_dl, 7, self.val_dl)

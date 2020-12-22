@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from ..utils import LRFinder, getlogger, spacy_tokenize
+from ..utils import LRFinder, getlogger
 from .utils.stub import MockLoggingHandler
 from .utils.model import LSTM
 from .utils.dataset import getYelpDataloader
+from .utils.stub import RegressionTrainer, ClassificationTrainer
 from ..trainer import BaseTrainer
 from ..metrics import Accuracy
 from ..callbacks import Argmax
@@ -22,7 +23,7 @@ class TestLRFinder:
         logger = getlogger()
         logger.parent.addHandler(self.handler)
 
-        self.train_dl, self.val_dl, vocab_size = getYelpDataloader(full=False)
+        self.train_dl, self.val_dl, vocab_size = getYelpDataloader()
         model = LSTM(
             vocab_size=vocab_size,
             embedding_dim=30,
@@ -30,15 +31,12 @@ class TestLRFinder:
             n_layers=1,
             n_classes=2,
         )
-        self.trainer = BaseTrainer(
+        self.trainer = ClassificationTrainer(
             model=model,
             criterion=nn.CrossEntropyLoss(),
             optimizer=torch.optim.Adam(model.parameters(), lr=1e-3),
             metrics=[Accuracy()],
-            callbacks=[Argmax()],
         )
-        self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
     def teardown_method(self, method):
         shutil.rmtree("plot")
@@ -48,6 +46,7 @@ class TestLRFinder:
         optimizer_state = copy.deepcopy(self.trainer.optimizer.state_dict())
 
         lr_finder = LRFinder(self.trainer)
+        #  lr_finder.fit(self.train_dl, self.val_dl, step_mode="exp")
         lr_finder.fit(self.train_dl, self.val_dl, step_mode="exp")
         assert (
             self.handler.messages["info"][-1]
@@ -81,7 +80,8 @@ class TestLRFinder:
         optimizer_state = copy.deepcopy(self.trainer.optimizer.state_dict())
 
         lr_finder = LRFinder(self.trainer)
-        lr_finder.fit(self.train_dl, self.val_dl, step_mode="linear")
+        #  lr_finder.fit(self.train_dl, self.val_dl, step_mode="linear")
+        lr_finder.fit(self.train_dl, step_mode="linear")
         assert (
             self.handler.messages["info"][-1]
             == "Learning rate search has finished. Model and "

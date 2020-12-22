@@ -1,9 +1,9 @@
 from . import Callback
+from ..utils import getlogger
 
 
 class EarlyStopping(Callback):
-    """Stop training when a monitored metric has stopped improving.
-    """
+    """Stop training when a monitored metric has stopped improving."""
 
     def __init__(
         self, monitor="val_loss", mode="min", min_delta=0, patience=5
@@ -28,6 +28,7 @@ class EarlyStopping(Callback):
         self.patience = patience
         self.wait = 0
         self.best_score = float("inf") if self.mode == "min" else float("-inf")
+        self.logger = getlogger(__name__)
         super().__init__()
 
     def on_train_begin(self, logs):
@@ -45,11 +46,20 @@ class EarlyStopping(Callback):
         ) or (
             (score - self.best_score) > self.min_delta and self.mode == "max"
         ):
+            self.logger.debug(
+                "%s improved on epoch %d", self.monitor, logs["epoch_idx"]
+            )
             self.best_score = score
             self.wait = 0
         elif self.wait >= self.patience:
             return True
-        self.wait += 1
+        else:
+            self.wait += 1
+            self.logger.debug(
+                "No improved on epoch %d, wait=%d",
+                logs["epoch_idx"],
+                self.wait,
+            )
         return False
 
     def __getstate__(self):

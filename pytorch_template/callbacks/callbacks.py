@@ -31,7 +31,7 @@ class CallbackHandler:
 
         Args(keys in logs):
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         """
@@ -42,56 +42,34 @@ class CallbackHandler:
         """Called before the output and loss are computed.
 
         Args(keys in logs):
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            batch_dict (Dict[str, torch.Tensor]): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
-            batch_size (int): The batch size of current batch.
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         Examples:
-            Further custom reshaping the input.
+            Moving tensors to gpu.
 
         """
         for callback in self.callbacks:
             callback.on_train_batch_begin(logs)
 
-    def on_loss_begin(self, logs):
-        """Called after the output is computed, but before the loss is computed.
-
-        Args(keys in logs):
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
-                which starts at 1.
-            batch_size (int): The batch size of current batch.
-            n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
-            n_epochs (int): Total number of epochs.
-
-        Examples:
-            Do transformation on `last_y_pred` prior for loss function.
-
-        """
-        for callback in self.callbacks:
-            callback.on_loss_begin(logs)
-
     def on_loss_end(self, logs):
         """Called after the output and loss are computed but before backprop.
 
         Args(keys in logs):
+            **other: All the outputs provided in training_step.
             loss (float): The avg loss of current training batch.
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
-                which starts at 1.
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
             batch_size (int): The batch size of current batch.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
+                which starts at 1.
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         """
@@ -102,15 +80,16 @@ class CallbackHandler:
         """Called after backprop but before the optimizer step.
 
         Args(keys in logs):
+            **other: All the outputs provided in training_step.
             loss (float): The avg loss of current training batch.
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
             batch_size (int): The batch size of current batch.
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         Examples:
@@ -125,89 +104,112 @@ class CallbackHandler:
         """Called after optimizer step and at the end of training this batch.
 
         Args(keys in logs):
-            loss (float): The avg loss of current training batch.
             `metric name` (float): Those metrics that passed to trainer.
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            **other: All the outputs provided in training_step.
+            loss (float): The avg loss of current training batch.
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
             batch_size (int): The batch size of current batch.
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         Examples:
             Keep track of the loss.
 
         """
-        stop = False
         for callback in self.callbacks:
-            if callback.on_train_batch_end(logs):
-                stop = True
-        return stop
+            callback.on_train_batch_end(logs)
 
     def on_val_begin(self, logs):
         """Called before validating in each epoch.
 
         Args(keys in logs):
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
+            n_batches (int): Total number of validation batches
 
         """
         for callback in self.callbacks:
             callback.on_val_begin(logs)
 
-    def on_test_batch_begin(self, logs):
+    def on_val_batch_begin(self, logs):
         """Called before the val output and loss are computed.
 
         Args(keys in logs):
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
-            batch_size (int): The batch size of current batch.
-            n_batches (int): Total number of testing batches.
+            n_batches (int): Total number of validation batches.
             n_epochs (int): Total number of epochs.
             batch_size (int): The batch size of current batch.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         """
         for callback in self.callbacks:
-            callback.on_test_batch_begin(logs)
+            callback.on_val_batch_begin(logs)
 
-    def on_test_batch_end(self, logs):
+    def on_val_batch_end(self, logs):
         """Called after the val loss and metrics computed, at the end
             of this val batch.
 
         Args(keys in logs):
             val_`metric name` (float): Those metrics that passed to trainer.
-            val_loss (torch.tensor): The avg validation loss of
+            val_loss (float): The avg validation loss of
                 current val batch.
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
             batch_size (int): The batch size of current batch.
             n_batches (int): Total number of testing batches.
             n_epochs (int): Total number of epochs.
             batch_size (int): The batch size of current batch.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         Examples:
             Keep track of the loss.
 
         """
         for callback in self.callbacks:
-            callback.on_test_batch_end(logs)
+            callback.on_val_batch_end(logs)
+
+    def on_val_end(self, logs):
+        """Called after validation is completed .
+
+        Args(keys in logs):
+            val_`metric name` (float): Those metrics that passed to trainer.
+            val_loss (float): The avg validation loss of
+                current val batch.
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
+                which starts at 1.
+            batch_size (int): The batch size of current batch.
+            n_batches (int): Total number of testing batches.
+            n_epochs (int): Total number of epochs.
+            batch_size (int): The batch size of current batch.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
+
+        """
+        for callback in self.callbacks:
+            callback.on_val_end(logs)
 
     def on_epoch_end(self, logs):
         """Called at the end of an epoch.
 
         Args(keys in logs):
+            val_`metric name` (float): The validation metrics for this epoch.
+            val_loss (float): The avg validation loss of this epoch.
+            `metric name` (float): The training metrics of this epoch.
+            loss (float): The avg training loss for this epoch.
             n_epochs (int): Total number of epochs.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         Returns:
             True to early stop if any callback return True.
@@ -224,7 +226,7 @@ class CallbackHandler:
 
         Args(keys in logs):
             n_epochs (int): Total number of epochs.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         Examples:
             Saving model and stuff.
@@ -255,7 +257,7 @@ class Callback:
 
         Args(keys in logs):
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         """
@@ -265,37 +267,15 @@ class Callback:
         """Called before the output and loss are computed.
 
         Args(keys in logs):
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
-            batch_size (int): The batch size of current batch.
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         Examples:
-            Further custom reshaping the input.
-
-        """
-        pass
-
-    def on_loss_begin(self, logs):
-        """Called after the output is computed, but before the loss is computed.
-
-        Args(keys in logs):
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
-                which starts at 1.
-            batch_size (int): The batch size of current batch.
-            n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
-            n_epochs (int): Total number of epochs.
-
-        Examples:
-            Do transformation on `last_y_pred` prior for loss function.
+            Moving tensors to gpu.
 
         """
         pass
@@ -304,15 +284,35 @@ class Callback:
         """Called after the output and loss are computed but before backprop.
 
         Args(keys in logs):
+            **other: All the outputs provided in training_step.
             loss (float): The avg loss of current training batch.
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_size (int): The batch size of current batch.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
+                which starts at 1.
+            n_batches (int): Total number of training batches.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
+            n_epochs (int): Total number of epochs.
+
+        """
+        pass
+
+    def on_loss_begin(self, logs):
+        """Called after the output and loss are computed but before backprop.
+
+        Args(keys in logs):
+            **other: All the outputs provided in training_step.
+            loss (float): The avg loss of current training batch.
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
             batch_size (int): The batch size of current batch.
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         """
@@ -322,15 +322,16 @@ class Callback:
         """Called after backprop but before the optimizer step.
 
         Args(keys in logs):
+            **other: All the outputs provided in training_step.
             loss (float): The avg loss of current training batch.
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
             batch_size (int): The batch size of current batch.
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         Examples:
@@ -344,72 +345,93 @@ class Callback:
         """Called after optimizer step and at the end of training this batch.
 
         Args(keys in logs):
-            loss (float): The avg loss of current training batch.
             `metric name` (float): Those metrics that passed to trainer.
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            **other: All the outputs provided in training_step.
+            loss (float): The avg loss of current training batch.
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
             batch_size (int): The batch size of current batch.
             n_batches (int): Total number of training batches.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
 
         Examples:
             Keep track of the loss.
 
         """
-        return False
+        pass
 
     def on_val_begin(self, logs):
         """Called before validating in each epoch.
 
         Args(keys in logs):
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
             n_epochs (int): Total number of epochs.
+            n_batches (int): Total number of validation batches
 
         """
         pass
 
-    def on_test_batch_begin(self, logs):
+    def on_val_batch_begin(self, logs):
         """Called before the val output and loss are computed.
 
         Args(keys in logs):
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
-            batch_size (int): The batch size of current batch.
-            n_batches (int): Total number of testing batches.
+            n_batches (int): Total number of validation batches.
             n_epochs (int): Total number of epochs.
             batch_size (int): The batch size of current batch.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         """
         pass
 
-    def on_test_batch_end(self, logs):
+    def on_val_batch_end(self, logs):
         """Called after the val loss and metrics computed, at the end
             of this val batch.
 
         Args(keys in logs):
             val_`metric name` (float): Those metrics that passed to trainer.
-            val_loss (torch.tensor): The avg validation loss of
+            val_loss (float): The avg validation loss of
                 current val batch.
-            last_y_pred (torch.tensor): The last output of the model.
-            last_X (torch.tensor): The last input of the model.
-            last_y_true (torch.tensor): The last target of the model.
-            batch (int): Index of the batch in current epoch,
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
                 which starts at 1.
             batch_size (int): The batch size of current batch.
             n_batches (int): Total number of testing batches.
             n_epochs (int): Total number of epochs.
             batch_size (int): The batch size of current batch.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         Examples:
             Keep track of the loss.
+
+        """
+        pass
+
+    def on_val_end(self, logs):
+        """Called after validation is completed .
+
+        Args(keys in logs):
+            val_`metric name` (float): Those metrics that passed to trainer.
+            val_loss (float): The avg validation loss of
+                current val batch.
+            y_pred (torch.tensor): The last output of the model.
+            y_true (torch.tensor): The last target of the model.
+            batch_dict (torch.tensor): The last input of the model.
+            batch_idx (int): Index of the batch in current epoch,
+                which starts at 1.
+            batch_size (int): The batch size of current batch.
+            n_batches (int): Total number of testing batches.
+            n_epochs (int): Total number of epochs.
+            batch_size (int): The batch size of current batch.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         """
         pass
@@ -418,8 +440,12 @@ class Callback:
         """Called at the end of an epoch.
 
         Args(keys in logs):
+            val_`metric name` (float): The validation metrics for this epoch.
+            val_loss (float): The avg validation loss of this epoch.
+            `metric name` (float): The training metrics of this epoch.
+            loss (float): The avg training loss for this epoch.
             n_epochs (int): Total number of epochs.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         Returns:
             True to early stop if any callback return True.
@@ -432,7 +458,7 @@ class Callback:
 
         Args(keys in logs):
             n_epochs (int): Total number of epochs.
-            epoch (int): Index of the current epoch, which starts at 1.
+            epoch_idx (int): Index of the current epoch, which starts at 1.
 
         Examples:
             Saving model and stuff.

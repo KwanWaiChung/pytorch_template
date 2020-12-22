@@ -1,61 +1,43 @@
-from ....data import Field, Iterator, TabularDataset
-from ....utils import spacy_tokenize, TextEncoder
-from ..stub import DummyIterator
+from torch.utils.data import DataLoader
+from allennlp.data import Vocabulary, PyTorchDataLoader
+from ....datasets.text_classification import TextClassificationDataset
 import torch
 import random
 import os
+import json
 
 # 170 -> 101010, good balance of 1 and 0
 torch.manual_seed(170)
 random.seed(170)
 
 
-def _postprocessor(example):
-    example.stars = 1 if example.stars > 3 else 0
-    return example
+class YelpDataset(TextClassificationDataset):
+    def __init__(self):
+        super().__init__(
+            max_len=50, label_transform=[lambda x: "pos" if x > 3 else "neg"]
+        )
+
+    def _read(self, file_path):
+        with open(file_path, "r") as f:
+            data = json.load(f)
+        for i, row in enumerate(data):
+            if i >= 30:
+                return
+            yield self.text_to_instance(row["text"], row["stars"])
 
 
-def getYelpDataloader(full=True):
-    """Example Yelp dataset
-
-        batch size: 4
-        max sequence length: 50
-        label: `1` if `stars` > 3, 0 otherwise.
-
-    Args:
-        full (bool): If True, use all examples.
-            Otherwise, use about 100 examples.
-    """
-    text = Field(
-        tokenizer=spacy_tokenize,
-        is_sequential=True,
-        to_lower=True,
-        fix_length=50,
-        batch_first=True,
+def getYelpDataloader():
+    reader = YelpDataset()
+    train_dataset = reader.read(getJsonFilename())
+    train_dataset, val_dataset = reader.split(train_dataset, 0.8)
+    vocab = Vocabulary.from_instances(train_dataset)
+    train_dataset.index_with(vocab)
+    val_dataset.index_with(vocab)
+    return (
+        PyTorchDataLoader(train_dataset, shuffle=True, batch_size=4),
+        PyTorchDataLoader(val_dataset, batch_size=1),
+        vocab.get_vocab_size("tokens"),
     )
-    label = Field(
-        is_sequential=False,
-        is_target=True,
-        to_lower=False,
-        to_numericalize=False,
-    )
-
-    ds = TabularDataset(
-        path=getJsonFilename(),
-        format="json",
-        fields={"text": text, "stars": label},
-        reader_params={"encoding": "utf-8"},
-        postprocessor=_postprocessor,
-    )
-    if not full:
-        ds, _ = ds.split(split_ratio=0.1, stratify_field="stars")
-
-    train_ds, val_ds = ds.split(split_ratio=0.8, stratify_field="stars")
-    train_dl = Iterator(train_ds, 4)
-    val_dl = Iterator(val_ds, 4)
-
-    encoder = text.build_vocab(train_ds)
-    return train_dl, val_dl, len(encoder)
 
 
 def getLinearDataloader(input_size):
@@ -64,9 +46,16 @@ def getLinearDataloader(input_size):
 
     val_X = torch.rand(80, input_size)
     val_y = (100 * val_X).sum(dim=1, keepdim=True) + 1 + torch.randn(80, 1)
-    train_dl = DummyIterator(train_X, train_y)
-    val_dl = DummyIterator(val_X, val_y)
-    return train_dl, val_dl
+
+    train_X = train_X.reshape(-1, 4, input_size)
+    train_y = train_y.reshape(-1, 4)
+    val_X = val_X.reshape(-1, 4, input_size)
+    val_y = val_y.reshape(-1, 4)
+
+    return [
+        {"train_X": train_X[i], "train_y": train_y[i]}
+        for i in range(len(train_X))
+    ], [{"val_X": val_X[i], "val_y": val_y[i]} for i in range(len(val_X))]
 
 
 def getTextData(n=50):
@@ -92,6 +81,9 @@ def getCsvFilename():
 
 
 def getJsonFilename():
+    """
+    Yelp
+    """
     return (
         f"{os.path.dirname(os.path.realpath(__file__))}"
         "/../../data/reviews.json"

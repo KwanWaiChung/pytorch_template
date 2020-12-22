@@ -1,5 +1,10 @@
 from .logger import getlogger
-from typing import Union, List
+from typing import Union, List, Tuple
+from allennlp.data import AllennlpDataset
+from sklearn.model_selection import train_test_split
+import numpy as np
+import random
+import torch
 
 logger = getlogger()
 
@@ -36,47 +41,42 @@ def get_split_ratio(split_ratio: Union[List[float], float]):
         )
 
 
-def pad(
-    x: List[str],
-    max_len: int = None,
-    pad_token: str = "<pad>",
-    sos_token: str = None,
-    eos_token: str = None,
-    pad_first: bool = False,
-    truncate_first: bool = False,
-):
-    paddings = [pad_token] * max(0, max_len - len(x))
-    sos_token = [sos_token] if sos_token else []
-    eos_token = [eos_token] if eos_token else []
-    truncated_tokens = x[-max_len:] if truncate_first else x[:max_len]
-    if pad_first:
-        return paddings + sos_token + truncated_tokens + eos_token
-    else:
-        return sos_token + truncated_tokens + eos_token + paddings
+def split(
+    dataset: AllennlpDataset,
+    split_ratio: Union[List[float], float, int],
+    stratify: List,
+    seed: int = 0,
+) -> Tuple[AllennlpDataset, AllennlpDataset]:
+    train_ratio, test_ratio, val_ratio = get_split_ratio(split_ratio)
+    n_test = int(test_ratio * len(dataset))
+    n_val = int(val_ratio * len(dataset))
+
+    train_instances, test_instances = train_test_split(
+        dataset.instances,
+        test_size=n_test,
+        stratify=stratify,
+        random_state=seed,
+    )
+    if n_val > 0:
+        train_instances, val_instances = train_test_split(
+            train_instances,
+            test_size=n_val,
+            stratify=stratify,
+            random_state=seed,
+        )
+        return (
+            AllennlpDataset(train_instances),
+            AllennlpDataset(test_instances),
+            AllennlpDataset(val_instances),
+        )
+    return AllennlpDataset(train_instances), AllennlpDataset(test_instances)
 
 
-def flatten_2d(y):
-    """Convert columns to 1d list. Unchange if input is a 1d list."
-
-    Args:
-        y (list): The list to convert.
-
-    Returns:
-        y (list): The flattened 1d list.
-    """
-    res = []
-    for ele in y:
-        if isinstance(ele, list):
-            for _ele in ele:
-                if isinstance(_ele, list):
-                    raise ValueError("Input is not 2d or 1d list")
-            res += ele
-        else:
-            res.append(ele)
-    return res
-
-
-def batch(examples, batch_size):
-    for i in range(0, len(examples), batch_size):
-        minibatch = examples[i : i + batch_size]
-        yield minibatch
+def set_seed(seed=1337):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    # Seed all GPUs with the same seed if available.
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.set_deterministic(True)

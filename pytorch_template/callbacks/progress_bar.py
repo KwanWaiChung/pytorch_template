@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 class ProgressBar(Callback):
     def __init__(self):
-        """ TQDM Progress Bar callback
+        """TQDM Progress Bar callback
 
         This callback is automatically applied to every trainer
         """
@@ -22,7 +22,7 @@ class ProgressBar(Callback):
         """Initialize the progress bar"""
         self.progbar = tqdm(total=logs["n_batches"], unit=" batches")
         self.progbar.set_description(
-            "Epoch %i/%i" % (logs["epoch"], logs["n_epochs"])
+            "Epoch %i/%i" % (logs["epoch_idx"], logs["n_epochs"])
         )
 
     def on_epoch_end(self, logs=None):
@@ -31,7 +31,7 @@ class ProgressBar(Callback):
             metric.name: f"{logs[metric.name]:.4f}"
             for metric in self.trainer.metrics
         }
-        log_data["loss"] = logs["loss"]
+        log_data["loss"] = f"{logs['loss']:.4f}"
 
         # validation metrics
         if self.trainer.use_val:
@@ -46,7 +46,6 @@ class ProgressBar(Callback):
         self.progbar.set_postfix(log_data)
         self.progbar.update(0)
         self.progbar.close()
-        return False
 
     def on_train_batch_end(self, logs=None):
         """Update the training metrics"""
@@ -54,7 +53,7 @@ class ProgressBar(Callback):
             metric.name: f"{logs[metric.name]:.4f}"
             for metric in self.trainer.metrics
         }
-        log_data["loss"] = logs["loss"]
+        log_data["loss"] = f"{logs['loss']:.4f}"
         self.progbar.set_postfix(log_data)
         self.progbar.update(1)
         return False

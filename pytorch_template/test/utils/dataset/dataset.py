@@ -26,16 +26,20 @@ class YelpDataset(TextClassificationDataset):
             yield self.text_to_instance(row["text"], row["stars"])
 
 
-def getYelpDataloader():
+def getYelpDataloader(train_batch_size=4, val_batch_size=1):
     reader = YelpDataset()
     train_dataset = reader.read(getJsonFilename())
     train_dataset, val_dataset = reader.split(train_dataset, 0.8)
+    if val_batch_size == -1:
+        val_batch_size = len(val_dataset)
     vocab = Vocabulary.from_instances(train_dataset)
     train_dataset.index_with(vocab)
     val_dataset.index_with(vocab)
     return (
-        PyTorchDataLoader(train_dataset, shuffle=True, batch_size=4),
-        PyTorchDataLoader(val_dataset, batch_size=1),
+        PyTorchDataLoader(
+            train_dataset, shuffle=True, batch_size=train_batch_size
+        ),
+        PyTorchDataLoader(val_dataset, batch_size=val_batch_size),
         vocab.get_vocab_size("tokens"),
     )
 

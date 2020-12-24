@@ -57,3 +57,27 @@ class ProgressBar(Callback):
         self.progbar.set_postfix(log_data)
         self.progbar.update(1)
         return False
+
+    def on_test_begin(self, logs):
+        """Initialize the progress bar"""
+        self.progbar = tqdm(total=logs["n_batches"], unit=" batches")
+        self.progbar.set_description("Testing")
+
+    def on_test_end(self, logs=None):
+        # testing metrics
+        log_data = {
+            k: "%.4f" % v for k, v in logs.items() if k.startswith("test_")
+        }
+
+        self.progbar.set_postfix(log_data)
+        self.progbar.update(0)
+        self.progbar.close()
+
+    def on_test_batch_end(self, logs=None):
+        """Update the training metrics"""
+        log_data = {
+            k: "%.4f" % v for k, v in logs.items() if k.startswith("test_")
+        }
+        self.progbar.set_postfix(log_data)
+        self.progbar.update(1)
+        return False

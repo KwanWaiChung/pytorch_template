@@ -1,7 +1,7 @@
 from allennlp.data import DatasetReader, Instance, AllennlpDataset
 from allennlp.data.tokenizers import Tokenizer, SpacyTokenizer
 from allennlp.data.token_indexers import TokenIndexer, SingleIdTokenIndexer
-from allennlp.data.fields import TextField, LabelField
+from allennlp.data.fields import TextField, LabelField, MetadataField
 from typing import Dict, List, Callable, Union, Iterable, Tuple
 from ..data import Pipeline
 from ..utils.googledrive_downloader import download_from_googledrive
@@ -38,6 +38,7 @@ class TextClassificationDataset(DatasetReader):
 
     def text_to_instance(self, text: str, label: Union[str, int]) -> Instance:
         fields = {}
+        fields["raw_text"] = MetadataField(text)
         text = self.text_transform(text)
         label = self.label_transform(label)
         tokens = self.tokenizer.tokenize(text)
@@ -73,6 +74,7 @@ class ImdbDataset(TextClassificationDataset):
         Args:
             file_path: The root folder for the dataset. It will download
                 from drive if folder doesn't exist.
+
         """
         self.n_examples = n_examples
         self.file_path = file_path

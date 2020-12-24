@@ -47,6 +47,18 @@ class History(Callback):
         self.val_samples += logs["batch_size"]
         logs["val_loss"] = self.val_loss
 
+    def on_test_begin(self, logs=None):
+        self.test_samples = 0
+        self.test_loss = 0
+
+    def on_test_batch_end(self, logs=None):
+        self.test_loss = (
+            logs["test_loss"] * logs["batch_size"]
+            + self.test_loss * self.test_samples
+        ) / (self.test_samples + logs["batch_size"])
+        self.test_samples += logs["batch_size"]
+        logs["test_loss"] = self.test_loss
+
     def on_epoch_end(self, logs=None):
         # training metrics
         log_data = {

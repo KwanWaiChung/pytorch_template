@@ -13,7 +13,6 @@ from .utils.dataset import getYelpDataloader
 from .utils.stub import RegressionTrainer, ClassificationTrainer
 from ..trainer import BaseTrainer
 from ..metrics import Accuracy
-from ..callbacks import Argmax
 
 
 class TestLRFinder:
@@ -39,7 +38,8 @@ class TestLRFinder:
         )
 
     def teardown_method(self, method):
-        shutil.rmtree("plot")
+        if os.path.exists("plot"):
+            shutil.rmtree("plot")
 
     def test_exponential_scheduling_with_plot(self):
         model_state = copy.deepcopy(self.trainer.model.state_dict())

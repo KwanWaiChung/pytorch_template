@@ -137,44 +137,8 @@ class ModelCheckpoint(Callback):
                 os.remove(old_file)
                 self.logger.info("Removed oldest checkpoint: %s", old_file)
 
-    def _load(self, filepath: str) -> int:
-        """Load checkpoint and restore trainer.
-
-        Args:
-            filepath: The path of the checkpoint file.
-
-        Returns:
-            epoch_idx: The epoch idx of the checkpoint.
-        """
-        checkpoint = torch.load(filepath)
-        self.trainer.model.load_state_dict(checkpoint["model_state_dict"])
-        self.trainer.optimizer.load_state_dict(
-            checkpoint["optimizer_state_dict"]
-        )
-        self.best_score = checkpoint[self.monitor]
-        self.best_filepath = checkpoint["best_filepath"]
-        # restore early stopping
-        for value in checkpoint.values():
-            if isinstance(value, EarlyStopping):
-                for i, c in enumerate(self.trainer.callbacks.callbacks):
-                    if isinstance(c, EarlyStopping):
-                        self.trainer.callbacks.callbacks[i] = value
-                        value.set_trainer(self.trainer)
-                        self.logger.debug("Restored EarlyStopping callback")
-        return checkpoint["epoch_idx"]
-
-    def _get_additional_save_dict(self):
-        """Get callbacks that required to save."""
-        save_dict = {}
-        for c in self.trainer.callbacks.callbacks:
-            if isinstance(c, EarlyStopping):
-                save_dict["early_stopping"] = c
-        return save_dict
-
-    def on_train_begin(self, logs):
-        if not self.load_weights_on_restart:
-            return
-
+    def _load(self, logs: Dict) -> int:
+        """Load checkpoint and restore trainer."""
         filepath = self._get_most_recent_checkpoint()
         if not filepath or not os.path.exists(filepath):
             self.logger.info(
@@ -182,19 +146,40 @@ class ModelCheckpoint(Callback):
                 filepath or self.filepath,
             )
             return
-        epoch_idx = self._load(filepath)
-
+        save_dict = torch.load(filepath)
+        logs["save_dict"] = save_dict
+        self.trainer.callbacks.on_load_checkpoint(logs)
         # checkpoint finished training on checkpoint['epoch']
-        logs["epoch_idx"] = epoch_idx + 1
         self.logger.info(
             "Model weights loaded from %s. Resuming training at %d epoch",
             filepath,
             logs["epoch_idx"],
         )
 
-    def on_epoch_end(self, logs):
+    def on_save_checkpoint(self, logs):
         save_dict = {"epoch_idx": logs["epoch_idx"]}
-        save_dict.update(self._get_additional_save_dict())
+        save_dict[self.monitor] = self.best_score
+        save_dict["best_filepath"] = self.best_filepath
+
+        if self.save_weights_only:
+            save_dict.update(self.trainer.state_dict())
+        else:
+            save_dict["model"] = self.trainer.model
+        logs["save_dict"]["model_checkpoint"] = save_dict
+
+    def on_load_checkpoint(self, logs):
+        save_dict = logs["save_dict"]["model_checkpoint"]
+        self.trainer.load_state_dict(save_dict)
+        self.best_score = save_dict[self.monitor]
+        self.best_filepath = save_dict["best_filepath"]
+        logs["epoch_idx"] = save_dict["epoch_idx"] + 1
+
+    def on_train_begin(self, logs):
+        if not self.load_weights_on_restart:
+            return
+        self._load(logs)
+
+    def on_epoch_end(self, logs):
         improved = False
         if self.monitor not in logs:
             raise ValueError(
@@ -208,14 +193,9 @@ class ModelCheckpoint(Callback):
             improved = True
             self.best_score = score
             self.best_filepath = self._get_filepath(logs)
-        save_dict[self.monitor] = self.best_score
-        save_dict["best_filepath"] = self.best_filepath
 
-        if self.save_weights_only:
-            save_dict.update(self.trainer._getstate())
-        else:
-            save_dict["model"] = self.trainer.model
-
+        self.trainer.callbacks.on_save_checkpoint(logs)
+        save_dict = logs["save_dict"]
         if self.save_best_only:
             if improved:
                 self._save(save_dict, logs)

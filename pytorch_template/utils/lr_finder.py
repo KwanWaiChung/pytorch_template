@@ -125,9 +125,7 @@ class LRFinder(object):
                 break
 
             self.history["lr"].append(lr_schedule.get_last_lr()[0])
-            loss = self.trainer._training_step(batch_dict, i)["loss"]
-            loss.backward()
-            self.trainer.optimizer.step()
+            loss = self.trainer._train_batch(batch_dict, i, tracking=False)
 
             if val_dl is not None:
                 self.trainer._validate(val_dl)
@@ -144,7 +142,7 @@ class LRFinder(object):
                 if loss < best_loss:
                     best_loss = loss
 
-            self.history["loss"].append(loss.item())
+            self.history["loss"].append(loss)
             if loss > diverge_th * best_loss:
                 self.logger.info("Stopping early, the loss has diverged")
                 break

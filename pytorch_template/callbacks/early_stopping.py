@@ -62,8 +62,11 @@ class EarlyStopping(Callback):
             )
         return False
 
-    def __getstate__(self):
+    def state_dict(self):
         return {k: v for k, v in self.__dict__.items() if k != "trainer"}
 
-    def __setstate__(self, d):
-        self.__dict__.update(d)
+    def on_save_checkpoint(self, logs):
+        logs["save_dict"]["early_stopping"] = self.state_dict()
+
+    def on_load_checkpoint(self, logs):
+        self.__dict__.update(logs["save_dict"]["early_stopping"])

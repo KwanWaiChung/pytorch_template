@@ -46,10 +46,6 @@ class BaseTrainer:
         self.criterion = criterion
         self.optimizer = optimizer
         self.metrics = metrics
-        #  model_checkpoint = model_checkpoint or ModelCheckpoint(
-        #      save_best_only=True
-        #  )
-        #  early_stopping = early_stopping or EarlyStopping()
         post_callbacks = []
         if early_stopping:
             post_callbacks.append(early_stopping)
@@ -104,10 +100,28 @@ class BaseTrainer:
         """
         raise NotImplementedError
 
+    def testing_step(self, batch_dict, batch_idx):
+        """Define a testing step of the model.
+
+        Args:
+            batch_dict: Input for the model.
+            batch_idx: Current batch idx of this epoch.
+
+        Returns:
+            Dict with required keys:
+                test_loss (torch.Tensor): The avg loss of current batch.
+                batch_size (int): The batch size of current batch.
+                y_pred (torch.Tensor): The predicted tensor.
+                y_true (torch.Tensor): The ground truth tensor.
+                    Optional, you should pass it if some metrics need it.
+
+        """
+        raise NotImplementedError
+
     def _training_step(
-        self, batch_dict: Dict[str, torch.Tensor], batch_idx: int
+        self, batch_dict: Dict[str, torch.Tensor]
     ) -> Dict[str, Any]:
-        outputs = self.training_step(batch_dict, batch_idx)
+        outputs = self.training_step(batch_dict, self.logs["batch_idx"])
         for key in ["loss", "batch_size", "y_pred", "y_true"]:
             if key not in outputs:
                 raise KeyError(
@@ -119,9 +133,9 @@ class BaseTrainer:
         return outputs
 
     def _validation_step(
-        self, batch_dict: Dict[str, torch.Tensor], batch_idx: int
+        self, batch_dict: Dict[str, torch.Tensor]
     ) -> Dict[str, Any]:
-        outputs = self.validation_step(batch_dict, batch_idx)
+        outputs = self.validation_step(batch_dict, self.logs["batch_idx"])
         for key in ["val_loss", "batch_size", "y_pred", "y_true"]:
             if key not in outputs:
                 raise KeyError(
@@ -131,6 +145,23 @@ class BaseTrainer:
         outputs["val_loss"] = outputs["val_loss"].item()
         outputs["y_pred"] = outputs["y_pred"].detach().cpu()
         outputs["y_true"] = outputs["y_true"].detach().cpu()
+        return outputs
+
+    def _testing_step(
+        self,
+        batch_dict: Dict[str, torch.Tensor],
+    ) -> Dict[str, Any]:
+        outputs = self.testing_step(batch_dict, self.logs["batch_idx"])
+        for key in ["test_loss", "batch_size", "y_pred"]:
+            if key not in outputs:
+                raise KeyError(
+                    f"`{key}` should be included in the returned dict "
+                    "of `testing_step()`"
+                )
+        outputs["test_loss"] = outputs["test_loss"].item()
+        outputs["y_pred"] = outputs["y_pred"].detach().cpu()
+        if "y_true" in outputs:
+            outputs["y_true"] = outputs["y_true"].detach().cpu()
         return outputs
 
     def fit(self, train_dl: Iterable, n_epochs: int, val_dl: Iterable = None):
@@ -157,6 +188,30 @@ class BaseTrainer:
         if self.use_val:
             self._validate(val_dl)
 
+    def _train_batch(self, batch_dict: Dict, batch_idx: int, tracking=True):
+        """
+        Returns:
+            loss (float): The loss of current batch
+            tracking (bool): Enable `on_train_batch_end` for comprehensive
+                logging
+        """
+        self.logs["batch_dict"] = batch_dict
+        self.logs["batch_idx"] = batch_idx
+        self.callbacks.on_train_batch_begin(self.logs)
+
+        outputs = self._training_step(self.logs["batch_dict"])
+        loss = outputs["loss"]
+        self.logs.update(outputs)
+        self.callbacks.on_loss_end(self.logs)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.callbacks.on_step_begin(self.logs)
+        self.optimizer.step()
+        if tracking:
+            self.callbacks.on_train_batch_end(self.logs)
+        return loss.item()
+
     def _train(self, train_dl):
         """Training for one epoch.
 
@@ -166,20 +221,7 @@ class BaseTrainer:
         """
         self.model.train()
         for i, batch_dict in enumerate(train_dl, 1):
-            self.logs["batch_dict"] = batch_dict
-            self.logs["batch_idx"] = i
-            self.callbacks.on_train_batch_begin(self.logs)
-
-            outputs = self._training_step(self.logs["batch_dict"], batch_idx=i)
-            loss = outputs["loss"]
-            self.logs.update(outputs)
-            self.callbacks.on_loss_end(self.logs)
-
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.callbacks.on_step_begin(self.logs)
-            self.optimizer.step()
-            self.callbacks.on_train_batch_end(self.logs)
+            self._train_batch(batch_dict, i)
 
     def _validate(self, val_dl):
         self.model.eval()
@@ -191,14 +233,34 @@ class BaseTrainer:
                 self.logs["batch_idx"] = i
                 self.callbacks.on_val_batch_begin(self.logs)
 
-                outputs = self._validation_step(
-                    self.logs["batch_dict"], batch_idx=i
-                )
+                outputs = self._validation_step(self.logs["batch_dict"])
                 self.logs.update(outputs)
                 self.callbacks.on_val_batch_end(self.logs)
         self.callbacks.on_val_end(self.logs)
 
-    def _getstate(self):
+    def test(self, test_dl):
+        self.model.eval()
+        self.logs = {}
+        self.logs["n_batches"] = len(test_dl)
+        self.callbacks.on_test_begin(self.logs)
+        with torch.no_grad():
+            for i, batch_dict in enumerate(test_dl, 1):
+                self.logs["batch_dict"] = batch_dict
+                self.logs["batch_idx"] = i
+                self.callbacks.on_test_batch_begin(self.logs)
+
+                outputs = self._testing_step(self.logs["batch_dict"])
+                self.logs.update(outputs)
+                self.callbacks.on_test_batch_end(self.logs)
+        self.callbacks.on_test_end(self.logs)
+
+    def get_best_filepath(self):
+        for cb in self.callbacks.callbacks:
+            if isinstance(cb, ModelCheckpoint):
+                return cb.best_filepath
+        return None
+
+    def state_dict(self):
         """Get all the related state dicts for saving.
         Will be called from model_checkpoint callback.
 
@@ -209,3 +271,7 @@ class BaseTrainer:
             "model_state_dict": self.model.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
         }
+
+    def load_state_dict(self, d):
+        self.model.load_state_dict(d["model_state_dict"])
+        self.optimizer.load_state_dict(d["optimizer_state_dict"])

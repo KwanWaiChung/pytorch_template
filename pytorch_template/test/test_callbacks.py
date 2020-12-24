@@ -3,7 +3,6 @@ from ..callbacks import (
     Callback,
     ProgressBar,
     History,
-    Argmax,
     ModelCheckpoint,
     EarlyStopping,
     Wandblogger,
@@ -36,7 +35,7 @@ logger.parent.addHandler(handler)
 torch.manual_seed(170)
 
 
-class TestingCallback(Callback):
+class SimpleCallback(Callback):
     def __init__(self, metric: str = None):
         super().__init__()
         self.metric = metric
@@ -216,7 +215,7 @@ def test_callback_basic():
         model=model,
         criterion=nn.CrossEntropyLoss(),
         optimizer=torch.optim.Adam(model.parameters(), lr=lr),
-        callbacks=[TestingCallback()],
+        callbacks=[SimpleCallback()],
         metrics=[Accuracy()],
     )
     trainer.fit(train_dl=train_dl, n_epochs=3, val_dl=val_dl)
@@ -265,7 +264,7 @@ class TestModelCheckpoint:
 
         state_dict = torch.load(
             os.path.join("saved/models", "checkpoint_02_0.6076.pth")
-        )
+        )["model_checkpoint"]
 
         for (k1, v1), (k2, v2) in zip(
             state_dict["model_state_dict"].items(),
@@ -296,7 +295,7 @@ class TestModelCheckpoint:
 
         state_dict = torch.load(
             os.path.join("saved/models", "checkpoint_02_0.6076.pth")
-        )
+        )["model_checkpoint"]
         assert "model_state_dict" in state_dict
         assert "optimizer_state_dict" in state_dict
 
@@ -326,7 +325,7 @@ class TestModelCheckpoint:
 
         state_dict = torch.load(
             os.path.join("saved/models", "checkpoint_01_0.6704.pth")
-        )
+        )["model_checkpoint"]
         assert "model" in state_dict
         assert "model_state_dict" not in state_dict
         assert "optimizer_state_dict" not in state_dict
@@ -357,7 +356,7 @@ class TestModelCheckpoint:
         # load pickle and check if parameters are the same
         state_dict = torch.load(
             os.path.join("saved/models", "checkpoint_01_0.6704.pth")
-        )
+        )["model_checkpoint"]
         model.load_state_dict(state_dict["model_state_dict"])
         for (k1, v1), (k2, v2) in zip(
             model.state_dict().items(), trainer.model.state_dict().items()
@@ -382,7 +381,7 @@ class TestModelCheckpoint:
         )
         trainer.fit(self.train_dl, 1, self.val_dl)
         assert len(os.listdir("saved/models")) == 1
-        assert "checkpoint_01_0.6803_0.6704_0.6333.pth" in os.listdir(
+        assert "checkpoint_01_0.6803_0.6704_0.6667.pth" in os.listdir(
             "saved/models"
         )
 
@@ -635,6 +634,7 @@ class TestEarlyStopping:
 #              optimizer=torch.optim.Adam(self.model.parameters(), lr=self.lr),
 #              callbacks=callbacks,
 #              metrics=[Accuracy()],
+#              model_checkpoint=ModelCheckpoint(save_best_only=True),
 #          )
 
 #      # disable this test as it will create the ckpt which
@@ -646,3 +646,4 @@ class TestEarlyStopping:
 #          trainer = self.get_trainer([logger])
 #          trainer.delay = True
 #          trainer.fit(self.train_dl, 7, self.val_dl)
+#          trainer.test(self.train_dl)

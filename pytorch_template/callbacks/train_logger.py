@@ -36,7 +36,20 @@ class Wandblogger(Callback):
                 wandb.log({k: v}, step=logs["epoch_idx"])
         return False
 
+    def on_test_batch_end(self, logs):
+        """
+        Perhaps it's more direct to log customly in trainer, or output to
+        a csv file.
+        """
+        #  if "table" in logs:
+        #      columns = list(logs["table"][0].keys())
+        #      data = [
+        #          [example[key] for key in columns] for example in logs["table"]
+        #      ]
+        #      table = wandb.Table(data=data, columns=columns)
+        #      wandb.log({"test examples": table})
+        return
+
     def on_train_end(self, logs):
-        for v in self.trainer.callbacks.callbacks:
-            if isinstance(v, ModelCheckpoint):
-                wandb.save(v.best_filepath)
+        if best_filepath := self.trainer.get_best_filepath():
+            wandb.save(best_filepath)

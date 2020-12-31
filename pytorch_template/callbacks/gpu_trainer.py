@@ -3,8 +3,8 @@ import torch
 
 
 class GpuTrainer(Callback):
-    def __init__(self, device_id=0):
-        if device_id == "cpu" or not torch.cuda.is_available():
+    def __init__(self, device_id: int = None):
+        if device_id is None or not torch.cuda.is_available():
             self.device = torch.device("cpu")
         else:
             self.device = torch.device("cuda:" + str(device_id))

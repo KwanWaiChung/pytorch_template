@@ -40,7 +40,7 @@ class BaseTrainer:
         callbacks: List["Callback"] = [],
         model_checkpoint: ModelCheckpoint = None,
         early_stopping: EarlyStopping = None,
-        gpu: int = 0,
+        gpu_id: int = None,
     ):
         self.model = model
         self.criterion = criterion
@@ -54,7 +54,7 @@ class BaseTrainer:
         post_callbacks.append(ProgressBar())
         self.history = History()
         self.callbacks = CallbackHandler(
-            [GpuTrainer(gpu)]
+            [GpuTrainer(gpu_id)]
             + metrics
             + [self.history]
             + callbacks

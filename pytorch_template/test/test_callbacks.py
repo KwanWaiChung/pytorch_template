@@ -6,6 +6,7 @@ from ..callbacks import (
     ModelCheckpoint,
     EarlyStopping,
     Wandblogger,
+    GpuTrainer,
 )
 from ..trainer import BaseTrainer
 from ..metrics import Accuracy
@@ -647,3 +648,116 @@ class TestEarlyStopping:
 #          trainer.delay = True
 #          trainer.fit(self.train_dl, 7, self.val_dl)
 #          trainer.test(self.train_dl)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires gpu")
+class TestGpuTrainer:
+    def setup_method(self, method):
+        set_seed(170)
+        self.lr = 1e-2
+        self.device_id = 1
+        self.handler = MockLoggingHandler(level="DEBUG")
+        logger = getlogger()
+        logger.parent.addHandler(self.handler)
+
+        self.train_dl, self.val_dl, vocab_size = getYelpDataloader()
+        self.model = LSTM(
+            vocab_size=vocab_size,
+            embedding_dim=30,
+            hidden_dim=10,
+            n_layers=1,
+            n_classes=2,
+        )
+
+    def teardown_method(self, method):
+        if os.path.exists("saved/models"):
+            shutil.rmtree("saved/models")
+
+    def get_trainer(self, gpu_id=None, model_checkpoint=None):
+        return ClassificationTrainer(
+            model=self.model,
+            criterion=nn.CrossEntropyLoss(),
+            optimizer=torch.optim.Adam(self.model.parameters(), lr=self.lr),
+            early_stopping=None,
+            model_checkpoint=model_checkpoint,
+            gpu_id=gpu_id,
+            metrics=[Accuracy()],
+        )
+
+    def _check_dict(self, d):
+        for k, v in d.items():
+            if isinstance(v, dict):
+                self._check_dict(v)
+            elif isinstance(v, torch.Tensor):
+                assert v.device.type == "cuda"
+                assert v.device.index == self.device_id
+
+    def test_moved_gpu(self):
+        trainer = self.get_trainer(gpu_id=1)
+        # assume that the first callback is gputrainer
+        cb = trainer.callbacks.callbacks[0]
+        assert isinstance(cb, GpuTrainer)
+        assert cb.device.index == self.device_id
+        assert cb.device.type == "cuda"
+
+        assert next(trainer.model.parameters()).device.type == "cpu"
+        cb.on_train_begin({})
+        assert next(trainer.model.parameters()).device.type == "cuda"
+        assert next(trainer.model.parameters()).device.index == self.device_id
+
+        tensor = torch.randn(2, 2)
+        logs = {"batch_dict": {"x": tensor}, "dummy_extra": 3}
+        cb.on_train_batch_begin(logs)
+        assert logs["batch_dict"]["x"].device.type == "cuda"
+        assert logs["batch_dict"]["x"].device.index == self.device_id
+
+        tensor = torch.randn(2, 2)
+        logs = {"batch_dict": {"x": tensor}, "dummy_extra": 3}
+        cb.on_val_batch_begin(logs)
+        assert logs["batch_dict"]["x"].device.type == "cuda"
+        assert logs["batch_dict"]["x"].device.index == self.device_id
+
+        tensor = torch.randn(2, 2)
+        logs = {"batch_dict": {"x": tensor}, "dummy_extra": 3}
+        cb.on_test_batch_begin(logs)
+        assert logs["batch_dict"]["x"].device.type == "cuda"
+        assert logs["batch_dict"]["x"].device.index == self.device_id
+
+    def test_train_on_gpu(self):
+        trainer = self.get_trainer(gpu_id=1)
+        trainer.fit(train_dl=self.train_dl, n_epochs=2, val_dl=self.val_dl)
+        assert next(trainer.model.parameters()).device.type == "cuda"
+        assert next(trainer.model.parameters()).device.index == self.device_id
+        self._check_dict(trainer.logs["batch_dict"])
+
+    def test_restore_training_with_gpu(self):
+        filepath = "saved/models/checkpoint_{epoch_idx:02d}_{val_loss:.4f}.pth"
+        #  filepath = "save/last.pth"
+        trainer = self.get_trainer(
+            gpu_id=1,
+            model_checkpoint=ModelCheckpoint(
+                save_best_only=False,
+                save_weights_only=True,
+                load_weights_on_restart=True,
+                filepath=filepath,
+            ),
+        )
+        trainer.fit(self.train_dl, 1, self.val_dl)
+        assert (
+            self.handler.messages["info"][-1]
+            == f"{filepath} is not found. Start training from scratch."
+        )
+        assert len(os.listdir("saved/models")) == 1
+
+        # Resume training
+        filename = os.listdir("saved/models")[0]
+        d = torch.load("saved/models/" + filename)
+        self._check_dict(d)
+        trainer.fit(self.train_dl, 2, self.val_dl)
+        assert (
+            self.handler.messages["info"][-1]
+            == "Model weights loaded from saved/models/"
+            + filename
+            + ". Resuming training at 2 epoch"
+        )
+        assert len(os.listdir("saved/models")) == 2

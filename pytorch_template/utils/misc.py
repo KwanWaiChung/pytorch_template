@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 import random
 import torch
+from packaging import version
 
 logger = getlogger()
 
@@ -79,4 +80,8 @@ def set_seed(seed=1337):
     # Seed all GPUs with the same seed if available.
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
-        torch.set_deterministic(True)
+        torch.cuda.manual_seed(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        if version.parse(torch.__version__) >= version.parse("1.7.0"):
+            torch.set_deterministic(True)
